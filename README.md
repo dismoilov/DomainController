@@ -13,12 +13,15 @@
 | **Reverse Proxy** | HTTP и HTTPS проксирование по домену на внутренний IP:порт |
 | **Frontend HTTPS** | Автоматический Let's Encrypt для домена |
 | **Backend HTTPS** | Поддержка TLS-бэкендов (Proxmox, API и т.д.) |
+| **WebSocket** | Поддержка WebSocket (чаты, WebRTC, real-time приложения) |
+| **Stream TCP/UDP** | Проксирование TCP и UDP потоков (SIP, RTP, SSH и др.) через Nginx `stream {}` |
 | **Веб-панель** | Добавление / редактирование / удаление маршрутов через GUI |
 | **Группы** | Тегирование доменов по группам с фильтрацией |
 | **Аудит** | Лог всех действий — кто, когда, что изменил |
 | **Авторизация** | Логин / пароль для доступа к панели |
-| **Nginx sync** | Автогенерация `domain-routes.conf` + `nginx -t` + `reload` |
+| **Nginx sync** | Автогенерация `domain-routes.conf` + `stream-routes.conf` + `nginx -t` + `reload` |
 | **Auto-renew** | `certbot.timer` + deploy hook для автопродления сертификатов |
+| **Dev Mode** | Тестовый запуск без Nginx/Certbot на локальной машине |
 
 ---
 
@@ -27,19 +30,26 @@
 ```
 Внешний IP (напр. 213.230.69.181)
     │
-    ├── :80  ──► NAT ──► 10.100.10.250:80  (Nginx)
-    └── :443 ──► NAT ──► 10.100.10.250:443 (Nginx)
+    ├── :80  ──► NAT ──► 10.100.10.250:80  (Nginx http)
+    ├── :443 ──► NAT ──► 10.100.10.250:443 (Nginx http)
+    └── :5060/udp ──► NAT ──► 10.100.10.250:5060 (Nginx stream)
 
 Контроллер (10.100.10.250):
-    ├── Nginx          — приём и проксирование трафика
-    ├── Flask-панель   — веб-интерфейс (порт 5000)
-    ├── SQLite         — хранение маршрутов и аудита
-    └── Certbot        — выпуск и обновление сертификатов
+    ├── Nginx http {}     — HTTP/HTTPS reverse proxy (по домену)
+    ├── Nginx stream {}   — TCP/UDP forward (по порту)
+    ├── Flask-панель      — веб-интерфейс (порт 5000)
+    ├── SQLite            — хранение маршрутов и аудита
+    └── Certbot           — выпуск и обновление сертификатов
 
-Примеры маршрутов:
+Примеры HTTP-маршрутов:
     nettech.uz         → 10.100.10.240:80   (HTTP backend)
-    shop.nettech.uz    → 10.100.10.241:80   (HTTP backend)
+    shop.nettech.uz    → 10.100.10.241:80   (HTTP backend + WebSocket)
     vm.nettech.uz      → 10.100.10.210:8006 (HTTPS backend, Proxmox)
+
+Примеры Stream-маршрутов:
+    :5060/udp          → 10.100.10.220:5060 (FreePBX SIP)
+    :5061/tcp          → 10.100.10.220:5061 (SIP TLS)
+    :10000-20000/udp   → 10.100.10.220      (RTP media)
 ```
 
 ---
@@ -48,31 +58,66 @@
 
 ```
 /opt/domain-controller/
-├── app.py               # Flask-приложение
-├── requirements.txt     # Python-зависимости
-├── data.db              # SQLite (создаётся автоматически)
+├── app.py                  # Flask-приложение
+├── requirements.txt        # Python-зависимости
+├── data.db                 # SQLite (создаётся автоматически)
 ├── templates/
-│   ├── base.html        # Базовый layout
-│   ├── login.html       # Страница входа
-│   ├── list.html        # Список маршрутов
-│   ├── form.html        # Форма добавления/редактирования
-│   └── logs.html        # Аудит-логи
-└── venv/                # Python virtual environment
+│   ├── base.html           # Базовый layout + навигация
+│   ├── login.html          # Страница входа
+│   ├── list.html           # Список HTTP-маршрутов
+│   ├── form.html           # Форма HTTP-маршрута
+│   ├── streams_list.html   # Список TCP/UDP stream-маршрутов
+│   ├── stream_form.html    # Форма stream-маршрута
+│   └── logs.html           # Аудит-логи
+└── venv/                   # Python virtual environment
 ```
 
 ---
 
-## Предпосылки
+## Быстрый старт (Dev Mode)
+
+Для тестирования на своей машине **без Nginx и Certbot**:
+
+```bash
+# 1. Клонирование
+git clone https://github.com/dismoilov/DomainController.git
+cd DomainController
+
+# 2. Python venv
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Инициализация БД
+DEV_MODE=1 flask --app app.py init-db
+
+# 4. Создание пользователя (введите пароль)
+DEV_MODE=1 flask --app app.py create-user admin
+
+# 5. Запуск
+DEV_MODE=1 python app.py
+```
+
+Панель откроется: **http://127.0.0.1:5000**
+
+В Dev Mode:
+- Nginx не вызывается (`nginx -t`, `systemctl reload` — пропускаются)
+- Certbot не вызывается (Let's Encrypt имитируется)
+- Конфиги пишутся в папку проекта: `dev_domain-routes.conf`, `dev_stream-routes.conf`
+- Flask запускается с `debug=True`
+
+---
+
+## Установка на сервер (Production)
+
+### Предпосылки
 
 - **ОС:** Ubuntu 24.04 (или совместимый Debian-based дистрибутив)
 - **Внешний IP** с проброшенными портами:
   - `80/tcp → <IP контроллера>:80`
   - `443/tcp → <IP контроллера>:443`
+  - Дополнительные порты для stream-маршрутов (SIP, RTP и т.д.)
 - **DNS:** A-записи доменов указывают на внешний IP
-
----
-
-## Установка
 
 ### 1. Системные пакеты
 
@@ -106,18 +151,27 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 5. Nginx — включить `conf.d`
+### 5. Nginx — включить `conf.d` и `stream`
 
-Убедитесь, что в `/etc/nginx/nginx.conf` внутри блока `http {}` есть:
+Убедитесь, что в `/etc/nginx/nginx.conf`:
 
+**Внутри блока `http {}`:**
 ```nginx
 include /etc/nginx/conf.d/*.conf;
 ```
 
-Создайте пустой файл маршрутов:
+**Вне блока `http {}` (на верхнем уровне), добавьте:**
+```nginx
+include /etc/nginx/stream-routes.conf;
+```
+
+> ⚠️ Блок `stream {}` **не может** быть внутри `http {}` — это разные контексты Nginx.
+
+Создайте пустые файлы:
 
 ```bash
 sudo bash -c 'echo "# managed by domain controller" > /etc/nginx/conf.d/domain-routes.conf'
+sudo bash -c 'echo "# no stream routes configured yet" > /etc/nginx/stream-routes.conf'
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
@@ -207,6 +261,12 @@ sudo ufw allow 8080/tcp
 
 > Если панель должна быть только из локальной сети — **не** пробрасывайте порт `8080` на роутере.
 
+Для stream-маршрутов добавляйте соответствующие порты:
+```bash
+sudo ufw allow 5060/udp   # SIP
+sudo ufw allow 5061/tcp   # SIP TLS
+```
+
 ---
 
 ## Автопродление сертификатов
@@ -239,27 +299,49 @@ sudo certbot renew --dry-run
 
 ## Использование панели
 
-### Добавление домена
+### Добавление HTTP-домена
 
-1. Войдите по адресу `http://<IP>:8080`
-2. Нажмите **+ Добавить домен**
+1. Войдите в панель
+2. Нажмите **+ Домен**
 3. Заполните:
    - **Домен:** `example.com`
    - **Внутренний IP:** `10.100.10.240`
    - **Порт:** `80`
    - **Группа:** `Production` (опционально)
    - **Frontend HTTPS:** включить если нужен SSL
-   - **Backend HTTPS:** включить если бэкенд сам работает по TLS (Proxmox, API)
+   - **Backend HTTPS:** включить если бэкенд сам работает по TLS
+   - **WebSocket:** включить для real-time приложений
 4. Нажмите **Создать**
 5. Для SSL — нажмите кнопку **Let's Encrypt** в списке маршрутов
 
-### Примеры маршрутов
+### Добавление Stream-маршрута (TCP/UDP)
 
-| Домен | IP | Порт | Frontend HTTPS | Backend HTTPS | Группа |
-|-------|----|------|:-:|:-:|--------|
-| `nettech.uz` | `10.100.10.240` | `80` | ✅ | ❌ | NetTech |
-| `shop.nettech.uz` | `10.100.10.241` | `80` | ✅ | ❌ | Shop |
-| `vm.nettech.uz` | `10.100.10.210` | `8006` | ✅ | ✅ | Infra |
+1. Нажмите **+ Stream** или зайдите в **Stream-порты**
+2. Заполните:
+   - **Название:** `FreePBX SIP`
+   - **Входящий порт:** `5060`
+   - **Протокол:** `UDP`
+   - **Внутренний IP:** `10.100.10.220`
+   - **Внутренний порт:** `5060`
+   - **DNS-привязка:** `pbx.nettech.uz` (опционально, для справки)
+3. Нажмите **Создать**
+4. Добавьте NAT-проброс на роутере: `5060/udp → контроллер:5060`
+
+### Примеры HTTP-маршрутов
+
+| Домен | IP | Порт | Frontend HTTPS | Backend HTTPS | WS | Группа |
+|-------|----|------|:-:|:-:|:-:|--------|
+| `nettech.uz` | `10.100.10.240` | `80` | ✅ | ❌ | ❌ | NetTech |
+| `shop.nettech.uz` | `10.100.10.241` | `80` | ✅ | ❌ | ✅ | Shop |
+| `vm.nettech.uz` | `10.100.10.210` | `8006` | ✅ | ✅ | ❌ | Infra |
+
+### Примеры Stream-маршрутов
+
+| Имя | Порт | Протокол | Target | DNS-привязка | Группа |
+|-----|------|----------|--------|-------------|--------|
+| FreePBX SIP | `5060` | UDP | `10.100.10.220:5060` | `pbx.nettech.uz` | VoIP |
+| SIP TLS | `5061` | TCP | `10.100.10.220:5061` | `pbx.nettech.uz` | VoIP |
+| SSH Tunnel | `2222` | TCP | `10.100.10.200:22` | — | Infra |
 
 ---
 
@@ -277,10 +359,16 @@ curl -v -H "Host: nettech.uz" http://127.0.0.1/
 curl -vk --resolve nettech.uz:443:127.0.0.1 https://nettech.uz/
 ```
 
-### Просмотр текущего конфига
+### Просмотр HTTP-конфига
 
 ```bash
 sudo cat /etc/nginx/conf.d/domain-routes.conf
+```
+
+### Просмотр Stream-конфига
+
+```bash
+sudo cat /etc/nginx/stream-routes.conf
 ```
 
 ### Полный merged-конфиг Nginx
@@ -316,7 +404,7 @@ pip install -r requirements.txt
 sudo systemctl restart domain-controller.service
 ```
 
-> Новая версия автоматически добавит недостающие колонки в БД через `ensure_schema()`.
+> Новая версия автоматически добавит недостающие колонки и таблицы в БД через `ensure_schema()`.
 
 ---
 
@@ -326,6 +414,7 @@ sudo systemctl restart domain-controller.service
 |-----------|----------|-------------|
 | `DC_PANEL_SECRET` | Секретный ключ Flask (сессии) | `change-me` |
 | `LETSENCRYPT_EMAIL` | Email для Let's Encrypt | `admin@example.com` |
+| `DEV_MODE` | Тестовый режим (`1` = включён) | `0` |
 
 ---
 
@@ -343,7 +432,11 @@ sudo systemctl restart domain-controller.service
 
 Сертификат `nettech.uz` **не покроет** `shop.nettech.uz` (если только это не wildcard). Нажимайте **Let's Encrypt** для каждого домена отдельно.
 
-### 4. Удалите default-сайт Nginx
+### 4. Stream ≠ HTTP
+
+TCP/UDP stream-маршруты работают **по номеру порта**, а не по доменному имени. Домен в DNS нужен только для удобства (чтобы пользователи набирали `pbx.nettech.uz`, а не IP).
+
+### 5. Удалите default-сайт Nginx
 
 ```bash
 sudo rm -f /etc/nginx/sites-enabled/default

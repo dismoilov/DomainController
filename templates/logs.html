@@ -1,33 +1,49 @@
 {% extends "base.html" %}
 {% block content %}
-<h1 class="h3 mb-3">Журнал действий</h1>
+<h1 class="h3 mb-3"><i class="bi bi-journal-text"></i> Журнал действий</h1>
 
 {% if logs %}
-<table class="table table-sm table-striped table-hover">
-    <thead>
-    <tr>
-        <th>Время (UTC)</th>
-        <th>Пользователь</th>
-        <th>Действие</th>
-        <th>Домен</th>
-        <th>Детали</th>
-    </tr>
-    </thead>
-    <tbody>
-    {% for l in logs %}
-    <tr>
-        <td>{{ l.created_at }}</td>
-        <td>{{ l.username }}</td>
-        <td>{{ l.action }}</td>
-        <td>{{ l.domain or '' }}</td>
-        <td style="max-width: 400px; white-space: pre-wrap;">{{ l.details or '' }}</td>
-    </tr>
-    {% endfor %}
-    </tbody>
-</table>
+<div class="table-responsive">
+    <table class="table table-sm table-striped table-hover align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th style="width:160px;">Время (UTC)</th>
+                <th>Пользователь</th>
+                <th>Действие</th>
+                <th>Домен</th>
+                <th>Детали</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for l in logs %}
+            <tr>
+                <td class="small">{{ l.created_at.strftime('%Y-%m-%d %H:%M:%S') if l.created_at else '' }}</td>
+                <td><i class="bi bi-person-circle"></i> {{ l.username }}</td>
+                <td>
+                    {% if 'create' in l.action %}
+                    <span class="badge bg-success">{{ l.action }}</span>
+                    {% elif 'delete' in l.action %}
+                    <span class="badge bg-danger">{{ l.action }}</span>
+                    {% elif 'update' in l.action %}
+                    <span class="badge bg-warning text-dark">{{ l.action }}</span>
+                    {% elif 'letsencrypt' in l.action %}
+                    <span class="badge bg-info text-dark">{{ l.action }}</span>
+                    {% elif 'login' in l.action or 'logout' in l.action %}
+                    <span class="badge bg-secondary">{{ l.action }}</span>
+                    {% else %}
+                    <span class="badge bg-light text-dark border">{{ l.action }}</span>
+                    {% endif %}
+                </td>
+                <td>{{ l.domain or '—' }}</td>
+                <td class="small" style="max-width: 400px; white-space: pre-wrap;">{{ l.details or '' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
 {% else %}
 <div class="alert alert-info">
-    Логи пока отсутствуют.
+    <i class="bi bi-info-circle"></i> Логи пока отсутствуют.
 </div>
 {% endif %}
 {% endblock %}

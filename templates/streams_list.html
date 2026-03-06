@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0"><i class="bi bi-broadcast"></i> Stream-маршруты <small class="text-muted">(TCP/UDP)</small></h1>
+    <a class="btn btn-primary" href="{{ url_for('streams_add') }}"><i class="bi bi-plus-lg"></i> Добавить stream</a>
+</div>
+
+<!-- Фильтр по группе -->
+<div class="mb-3">
+    <form class="row g-2 align-items-center" method="get" action="{{ url_for('streams_index') }}">
+        <div class="col-auto">
+            <label class="form-label mb-0"><i class="bi bi-funnel"></i> Группа:</label>
+        </div>
+        <div class="col-auto">
+            <select name="group" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Все</option>
+                {% for g in groups %}
+                <option value="{{ g }}" {% if selected_group==g %}selected{% endif %}>{{ g }}</option>
+                {% endfor %}
+            </select>
+        </div>
+    </form>
+</div>
+
+{% if streams %}
+<div class="row g-3">
+    {% for s in streams %}
+    <div class="col-12 col-md-6 col-lg-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <h6 class="card-title mb-0">
+                        <i class="bi bi-broadcast"></i> {{ s.name }}
+                    </h6>
+                    {% if s.protocol == 'udp' %}
+                    <span class="badge bg-warning text-dark">UDP</span>
+                    {% else %}
+                    <span class="badge bg-primary">TCP</span>
+                    {% endif %}
+                </div>
+
+                <!-- Сервис -->
+                {% set preset = service_presets.get(s.service_type, {}) %}
+                {% if preset and s.service_type != 'custom' %}
+                <div class="mb-2">
+                    <span class="badge bg-light text-dark border">
+                        {{ preset.get('label', s.service_type) }}
+                    </span>
+                    <small class="text-muted">{{ preset.get('desc', '') }}</small>
+                </div>
+                {% endif %}
+
+                <!-- Порты -->
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <code class="fs-6">:{{ s.listen_port }}</code>
+                    <i class="bi bi-arrow-right text-muted"></i>
+                    <span>{{ s.target_host }}:<strong>{{ s.target_port }}</strong></span>
+                </div>
+
+                <!-- DNS и группа -->
+                {% if s.domain_hint %}
+                <div class="small text-muted mb-1">
+                    <i class="bi bi-link-45deg"></i> {{ s.domain_hint }}
+                </div>
+                {% endif %}
+
+                {% if s.domain_route %}
+                <div class="small mb-1">
+                    <i class="bi bi-globe text-primary"></i>
+                    Привязан к: <a href="{{ url_for('edit', route_id=s.domain_route.id) }}">{{ s.domain_route.domain
+                        }}</a>
+                </div>
+                {% endif %}
+
+                {% if s.group_name %}
+                <span class="badge bg-light text-dark border">{{ s.group_name }}</span>
+                {% endif %}
+            </div>
+            <div class="card-footer bg-transparent d-flex gap-1">
+                <a class="btn btn-sm btn-outline-secondary flex-fill"
+                    href="{{ url_for('streams_edit', stream_id=s.id) }}">
+                    <i class="bi bi-pencil"></i> Изменить
+                </a>
+                <form action="{{ url_for('streams_delete', stream_id=s.id) }}" method="post" class="flex-fill"
+                    onsubmit="return confirm('Удалить «{{ s.name }}» (порт {{ s.listen_port }})?');">
+                    <button class="btn btn-sm btn-outline-danger w-100" type="submit">
+                        <i class="bi bi-trash"></i> Удалить
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Stream-маршрутов пока нет.
+    <a href="{{ url_for('streams_add') }}">Добавьте TCP/UDP маршрут</a>.
+</div>
+{% endif %}
+
+<!-- Справка -->
+<div class="card mt-4 border-0 bg-dark text-light">
+    <div class="card-body">
+        <h6 class="card-title"><i class="bi bi-lightbulb"></i> Как это работает</h6>
+        <p class="card-text mb-2 small">
+            Stream-маршруты используют модуль Nginx <code>stream {}</code> для проксирования <strong>TCP и UDP</strong>
+            трафика.
+            Маршрутизация идёт <strong>по порту</strong>, а не по домену (UDP/TCP пакеты не содержат HTTP-заголовка
+            Host).
+        </p>
+        <p class="card-text mb-0 small">
+            <strong>WS/WSS</strong> — это HTTP/HTTPS, для них используйте <a href="{{ url_for('add') }}"
+                class="text-info">домены</a> с кастомными портами и WebSocket toggle.
+        </p>
+    </div>
+</div>
+{% endblock %}

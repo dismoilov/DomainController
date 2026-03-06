@@ -1,84 +1,122 @@
 {% extends "base.html" %}
 {% block content %}
 <h1 class="h3 mb-3">
+    <i class="bi bi-{% if route %}pencil{% else %}plus-circle{% endif %}"></i>
     {% if route %}Редактирование{% else %}Новый домен{% endif %}
 </h1>
 
-<form method="post" class="card p-3">
+<form method="post" class="card p-4">
+
+    <!-- Основное -->
+    <h6 class="text-muted mb-3"><i class="bi bi-globe"></i> Основное</h6>
+
     <div class="mb-3">
-        <label class="form-label">Домен</label>
-        <input type="text" class="form-control" name="domain"
-               placeholder="пример: nettech.uz"
-               value="{{ route.domain if route else '' }}" required>
-        <div class="form-text">
-            Один домен на одну запись. Пример: nettech.uz, shop.nettech.uz, vm.nettech.uz
+        <label class="form-label fw-semibold">Домен</label>
+        <input type="text" class="form-control" name="domain" placeholder="пример: nettech.uz или pbx.nettech.uz"
+            value="{{ route.domain if route else '' }}" required>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">Внутренний IP (target)</label>
+            <input type="text" class="form-control" name="target_host" placeholder="10.100.10.240"
+                value="{{ route.target_host if route else '' }}" required>
         </div>
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Внутренний IP</label>
-        <input type="text" class="form-control" name="target_host"
-               placeholder="пример: 10.100.10.240"
-               value="{{ route.target_host if route else '' }}" required>
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Порт</label>
-        <input type="number" class="form-control" name="target_port"
-               placeholder="пример: 80"
-               value="{{ route.target_port if route else 80 }}" required>
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Группа / тег</label>
-        <input type="text" class="form-control" name="group_name"
-               placeholder="пример: NetTech, Shop, Infra, Test"
-               value="{{ route.group_name if route and route.group_name else '' }}">
+        <div class="col-md-3">
+            <label class="form-label fw-semibold">Внутренний порт</label>
+            <input type="number" class="form-control" name="target_port" placeholder="80"
+                value="{{ route.target_port if route else 80 }}" required>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-semibold">Группа</label>
+            <input type="text" class="form-control" name="group_name" placeholder="NetTech, VoIP..."
+                value="{{ route.group_name if route and route.group_name else '' }}">
+        </div>
     </div>
 
     <hr>
+    <!-- Listen-порты -->
+    <h6 class="text-muted mb-3"><i class="bi bi-headphones"></i> Listen-порты</h6>
+    <div class="alert alert-light border small mb-3">
+        По умолчанию: HTTP на порту <strong>80</strong>, HTTPS на <strong>443</strong>.<br>
+        Для WS/WSS или других сервисов можно указать кастомные порты.
+        Например: WebSocket на <code>8088</code>, WSS на <code>8089</code>.
+    </div>
 
-    <div class="form-check form-switch mb-3">
-        <input class="form-check-input" type="checkbox" id="enable_https" name="enable_https"
-               {% if route and route.enable_https %}checked{% endif %}>
-        <label class="form-check-label" for="enable_https">
-            Включить HTTPS на домене (frontend HTTPS)
-        </label>
-        <div class="form-text">
-            Внешний клиент будет ходить по https://домен. Сертификат можно выпустить кнопкой Let's Encrypt.
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label class="form-label">HTTP listen порт</label>
+            <input type="number" class="form-control" name="listen_port" placeholder="80"
+                value="{{ route.listen_port if route else 80 }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">HTTPS/SSL listen порт</label>
+            <input type="number" class="form-control" name="listen_port_ssl" placeholder="443"
+                value="{{ route.listen_port_ssl if route else 443 }}">
         </div>
     </div>
 
-    <div class="form-check form-switch mb-3">
-        <input class="form-check-input" type="checkbox" id="backend_https" name="backend_https"
-               {% if route and route.backend_https %}checked{% endif %}>
-        <label class="form-check-label" for="backend_https">
-            Backend работает по HTTPS
-        </label>
-        <div class="form-text">
-            Включай для внутренних сервисов вроде Proxmox на 8006, HTTPS API и т.п.
+    <hr>
+    <!-- Протоколы -->
+    <h6 class="text-muted mb-3"><i class="bi bi-shield-lock"></i> Протоколы</h6>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="enable_https" name="enable_https" {% if route and
+                    route.enable_https %}checked{% endif %}>
+                <label class="form-check-label" for="enable_https">
+                    <i class="bi bi-lock-fill text-success"></i> Frontend HTTPS
+                </label>
+            </div>
+            <div class="form-text">SSL для домена (Let's Encrypt)</div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="backend_https" name="backend_https" {% if route and
+                    route.backend_https %}checked{% endif %}>
+                <label class="form-check-label" for="backend_https">
+                    <i class="bi bi-shield-lock text-info"></i> Backend HTTPS
+                </label>
+            </div>
+            <div class="form-text">Proxmox, HTTPS API и т.п.</div>
+        </div>
+        <div class="col-md-4">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="enable_websocket" name="enable_websocket" {% if
+                    route and route.enable_websocket %}checked{% endif %}>
+                <label class="form-check-label" for="enable_websocket">
+                    <i class="bi bi-lightning text-primary"></i> WebSocket
+                </label>
+            </div>
+            <div class="form-text">WS/WSS, чаты, WebRTC</div>
         </div>
     </div>
 
-    <div class="mb-3">
-        <label class="form-label">Путь к сертификату (fullchain.pem)</label>
-        <input type="text" class="form-control" name="ssl_cert_path"
-               placeholder="/etc/letsencrypt/live/DOMAIN/fullchain.pem"
-               value="{{ route.ssl_cert_path if route and route.ssl_cert_path else '' }}">
-    </div>
+    <hr>
+    <!-- SSL Сертификаты -->
+    <h6 class="text-muted mb-3"><i class="bi bi-file-earmark-lock"></i> SSL-сертификаты
+        <small class="text-muted fw-normal">(заполняются автоматически через Let's Encrypt)</small>
+    </h6>
 
-    <div class="mb-3">
-        <label class="form-label">Путь к приватному ключу (privkey.pem)</label>
-        <input type="text" class="form-control" name="ssl_key_path"
-               placeholder="/etc/letsencrypt/live/DOMAIN/privkey.pem"
-               value="{{ route.ssl_key_path if route and route.ssl_key_path else '' }}">
-        <div class="form-text">
-            Обычно эти поля заполняются автоматически после нажатия Let's Encrypt.
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label class="form-label">fullchain.pem</label>
+            <input type="text" class="form-control form-control-sm" name="ssl_cert_path"
+                placeholder="/etc/letsencrypt/live/DOMAIN/fullchain.pem"
+                value="{{ route.ssl_cert_path if route and route.ssl_cert_path else '' }}">
+        </div>
+        <div class="col-md-6">
+            <label class="form-label">privkey.pem</label>
+            <input type="text" class="form-control form-control-sm" name="ssl_key_path"
+                placeholder="/etc/letsencrypt/live/DOMAIN/privkey.pem"
+                value="{{ route.ssl_key_path if route and route.ssl_key_path else '' }}">
         </div>
     </div>
 
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 mt-3">
         <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i>
             {% if route %}Сохранить изменения{% else %}Создать{% endif %}
         </button>
         <a class="btn btn-secondary" href="{{ url_for('index') }}">Отмена</a>

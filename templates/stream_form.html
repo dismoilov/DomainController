@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h3 mb-3">
+    <i class="bi bi-{% if stream %}pencil{% else %}plus-circle{% endif %}"></i>
+    {% if stream %}Редактирование stream{% else %}Новый stream-маршрут{% endif %}
+</h1>
+
+<form method="post" class="card p-4">
+
+    <!-- Пресет и название -->
+    <h6 class="text-muted mb-3"><i class="bi bi-gear"></i> Тип сервиса</h6>
+
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">Пресет / тип</label>
+            <select class="form-select" name="service_type" id="service_type" onchange="applyPreset()">
+                {% for key, preset in service_presets.items() %}
+                <option value="{{ key }}" data-port="{{ preset.port or '' }}" data-protocol="{{ preset.protocol }}"
+                    data-desc="{{ preset.desc }}" {% if stream and stream.service_type==key %}selected{% endif %} {% if
+                    not stream and key=='custom' %}selected{% endif %}>{{ preset.label }} — {{ preset.desc }}</option>
+                {% endfor %}
+            </select>
+            <div class="form-text" id="preset-hint">Выберите пресет для автозаполнения портов.</div>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">Название</label>
+            <input type="text" class="form-control" name="name" id="stream_name"
+                placeholder="FreePBX SIP, SSH Tunnel..." value="{{ stream.name if stream else '' }}" required>
+        </div>
+    </div>
+
+    <hr>
+    <!-- Порты и протокол -->
+    <h6 class="text-muted mb-3"><i class="bi bi-shuffle"></i> Маршрутизация</h6>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label fw-semibold">Входящий порт (listen)</label>
+            <input type="number" class="form-control" name="listen_port" id="listen_port" placeholder="5060"
+                value="{{ stream.listen_port if stream else '' }}" required>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label fw-semibold">Протокол</label>
+            <select class="form-select" name="protocol" id="protocol">
+                <option value="tcp" {% if not stream or stream.protocol=='tcp' %}selected{% endif %}>TCP</option>
+                <option value="udp" {% if stream and stream.protocol=='udp' %}selected{% endif %}>UDP</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <div class="alert alert-light border small mb-0 h-100 d-flex align-items-center">
+                <div>
+                    <strong>TCP</strong> — SSH, SIP-TLS, HTTP, FTP, базы данных<br>
+                    <strong>UDP</strong> — SIP, RTP, DNS, VPN, медиа-потоки
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">Внутренний IP (target)</label>
+            <input type="text" class="form-control" name="target_host" placeholder="10.100.10.220"
+                value="{{ stream.target_host if stream else '' }}" required>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label fw-semibold">Внутренний порт (target)</label>
+            <input type="number" class="form-control" name="target_port" id="target_port" placeholder="5060"
+                value="{{ stream.target_port if stream else '' }}" required>
+        </div>
+    </div>
+
+    <hr>
+    <!-- Привязка и группа -->
+    <h6 class="text-muted mb-3"><i class="bi bi-link-45deg"></i> Привязка</h6>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label">Привязать к домену</label>
+            <select class="form-select" name="domain_route_id">
+                <option value="">— Не привязан —</option>
+                {% for d in domains %}
+                <option value="{{ d.id }}" {% if stream and stream.domain_route_id==d.id %}selected{% endif %}>{{
+                    d.domain }}</option>
+                {% endfor %}
+            </select>
+            <div class="form-text">
+                Stream-порт появится под карточкой домена в общем списке.
+            </div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">DNS-привязка (метка)</label>
+            <input type="text" class="form-control" name="domain_hint" placeholder="pbx.nettech.uz"
+                value="{{ stream.domain_hint if stream and stream.domain_hint else '' }}">
+            <div class="form-text">
+                Справочная метка (DNS A-запись).
+            </div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Группа</label>
+            <input type="text" class="form-control" name="group_name" placeholder="VoIP, Infra..."
+                value="{{ stream.group_name if stream and stream.group_name else '' }}">
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i>
+            {% if stream %}Сохранить{% else %}Создать{% endif %}
+        </button>
+        <a class="btn btn-secondary" href="{{ url_for('streams_index') }}">Отмена</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function applyPreset() {
+        const select = document.getElementById('service_type');
+        const option = select.options[select.selectedIndex];
+
+        const port = option.dataset.port;
+        const protocol = option.dataset.protocol;
+        const desc = option.dataset.desc;
+
+        if (port) {
+            document.getElementById('listen_port').value = port;
+            document.getElementById('target_port').value = port;
+        }
+
+        const protocolSelect = document.getElementById('protocol');
+        for (let i = 0; i < protocolSelect.options.length; i++) {
+            if (protocolSelect.options[i].value === protocol) {
+                protocolSelect.selectedIndex = i;
+                break;
+            }
+        }
+
+        document.getElementById('preset-hint').textContent = desc || '';
+
+        // Авто-заполнение имени если пусто
+        const nameField = document.getElementById('stream_name');
+        if (!nameField.value) {
+            nameField.value = option.textContent.split(' — ')[0].trim();
+        }
+    }
+</script>
+{% endblock %}
