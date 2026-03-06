@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h3 mb-3">Журнал действий</h1>
+
+{% if logs %}
+<table class="table table-sm table-striped table-hover">
+    <thead>
+    <tr>
+        <th>Время (UTC)</th>
+        <th>Пользователь</th>
+        <th>Действие</th>
+        <th>Домен</th>
+        <th>Детали</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for l in logs %}
+    <tr>
+        <td>{{ l.created_at }}</td>
+        <td>{{ l.username }}</td>
+        <td>{{ l.action }}</td>
+        <td>{{ l.domain or '' }}</td>
+        <td style="max-width: 400px; white-space: pre-wrap;">{{ l.details or '' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="alert alert-info">
+    Логи пока отсутствуют.
+</div>
+{% endif %}
+{% endblock %}

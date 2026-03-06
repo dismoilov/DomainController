@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 class="h3 mb-3">
+    {% if route %}Редактирование{% else %}Новый домен{% endif %}
+</h1>
+
+<form method="post" class="card p-3">
+    <div class="mb-3">
+        <label class="form-label">Домен</label>
+        <input type="text" class="form-control" name="domain"
+               placeholder="пример: nettech.uz"
+               value="{{ route.domain if route else '' }}" required>
+        <div class="form-text">
+            Один домен на одну запись. Пример: nettech.uz, shop.nettech.uz, vm.nettech.uz
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Внутренний IP</label>
+        <input type="text" class="form-control" name="target_host"
+               placeholder="пример: 10.100.10.240"
+               value="{{ route.target_host if route else '' }}" required>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Порт</label>
+        <input type="number" class="form-control" name="target_port"
+               placeholder="пример: 80"
+               value="{{ route.target_port if route else 80 }}" required>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Группа / тег</label>
+        <input type="text" class="form-control" name="group_name"
+               placeholder="пример: NetTech, Shop, Infra, Test"
+               value="{{ route.group_name if route and route.group_name else '' }}">
+    </div>
+
+    <hr>
+
+    <div class="form-check form-switch mb-3">
+        <input class="form-check-input" type="checkbox" id="enable_https" name="enable_https"
+               {% if route and route.enable_https %}checked{% endif %}>
+        <label class="form-check-label" for="enable_https">
+            Включить HTTPS на домене (frontend HTTPS)
+        </label>
+        <div class="form-text">
+            Внешний клиент будет ходить по https://домен. Сертификат можно выпустить кнопкой Let's Encrypt.
+        </div>
+    </div>
+
+    <div class="form-check form-switch mb-3">
+        <input class="form-check-input" type="checkbox" id="backend_https" name="backend_https"
+               {% if route and route.backend_https %}checked{% endif %}>
+        <label class="form-check-label" for="backend_https">
+            Backend работает по HTTPS
+        </label>
+        <div class="form-text">
+            Включай для внутренних сервисов вроде Proxmox на 8006, HTTPS API и т.п.
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Путь к сертификату (fullchain.pem)</label>
+        <input type="text" class="form-control" name="ssl_cert_path"
+               placeholder="/etc/letsencrypt/live/DOMAIN/fullchain.pem"
+               value="{{ route.ssl_cert_path if route and route.ssl_cert_path else '' }}">
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Путь к приватному ключу (privkey.pem)</label>
+        <input type="text" class="form-control" name="ssl_key_path"
+               placeholder="/etc/letsencrypt/live/DOMAIN/privkey.pem"
+               value="{{ route.ssl_key_path if route and route.ssl_key_path else '' }}">
+        <div class="form-text">
+            Обычно эти поля заполняются автоматически после нажатия Let's Encrypt.
+        </div>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+            {% if route %}Сохранить изменения{% else %}Создать{% endif %}
+        </button>
+        <a class="btn btn-secondary" href="{{ url_for('index') }}">Отмена</a>
+    </div>
+</form>
+{% endblock %}
