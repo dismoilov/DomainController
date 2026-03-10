@@ -122,7 +122,12 @@ DEV_MODE=1 python app.py
 ### 1. Системные пакеты
 
 ```bash
-sudo apt update && sudo apt install -y nginx python3-venv python3-pip certbot sqlite3
+sudo apt update && sudo apt upgrade - y 
+```
+
+```bash
+sudo apt install -y nginx python3-venv python3-pip certbot sqlite3 libnginx-mod-stream
+sudo rm -f /etc/nginx/sites-enabled/default
 ```
 
 ### 2. ACME webroot
@@ -158,6 +163,7 @@ pip install -r requirements.txt
 **Внутри блока `http {}`:**
 ```nginx
 include /etc/nginx/conf.d/*.conf;
+include /etc/nginx/sites-enabled/*;
 ```
 
 **Вне блока `http {}` (на верхнем уровне), добавьте:**
@@ -172,7 +178,11 @@ include /etc/nginx/stream-routes.conf;
 ```bash
 sudo bash -c 'echo "# managed by domain controller" > /etc/nginx/conf.d/domain-routes.conf'
 sudo bash -c 'echo "# no stream routes configured yet" > /etc/nginx/stream-routes.conf'
+sudo mkdir -p /var/www/certbot
+sudo chmod 755 /var/www/certbot
 sudo nginx -t && sudo systemctl reload nginx
+sudo systemctl restart nginx
+sudo systemctl status nginx --no-pager
 ```
 
 ### 6. Инициализация базы данных
