@@ -1,0 +1,449 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    .filter-panel {
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 16px;
+    }
+
+    .filter-panel label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        color: #6c757d;
+        margin-bottom: 2px;
+    }
+
+    .filter-panel .form-control,
+    .filter-panel .form-select {
+        font-size: 0.85rem;
+    }
+
+    .req-table th {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        color: #6c757d;
+        cursor: pointer;
+        white-space: nowrap;
+        user-select: none;
+    }
+
+    .req-table th:hover {
+        color: #0d6efd;
+    }
+
+    .req-table th .sort-icon {
+        font-size: 0.65rem;
+        margin-left: 2px;
+        opacity: 0.4;
+    }
+
+    .req-table th.sorted .sort-icon {
+        opacity: 1;
+        color: #0d6efd;
+    }
+
+    .req-table td {
+        font-size: 0.82rem;
+        vertical-align: middle;
+    }
+
+    .badge-status {
+        font-size: 0.72rem;
+        min-width: 36px;
+    }
+
+    .badge-method {
+        font-size: 0.68rem;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        min-width: 42px;
+    }
+
+    .uri-cell {
+        max-width: 280px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .ua-cell {
+        max-width: 200px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .pagination .page-link {
+        font-size: 0.85rem;
+    }
+
+    .info-bar {
+        font-size: 0.8rem;
+    }
+
+    .filter-toggle {
+        cursor: pointer;
+    }
+
+    .req-row:hover {
+        background: #f0f4ff !important;
+    }
+
+    .time-cell {
+        white-space: nowrap;
+        font-size: 0.78rem;
+    }
+</style>
+
+{% if dev_mode %}
+<div class="alert alert-warning py-1 small mb-2">
+    <i class="bi bi-exclamation-triangle"></i> <strong>DEV MODE</strong> — фейковые данные
+</div>
+{% endif %}
+
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-center mb-2">
+    <h5 class="mb-0"><i class="bi bi-list-ul"></i> Журнал запросов</h5>
+    <div class="d-flex gap-2 align-items-center">
+        <button class="btn btn-sm btn-outline-secondary filter-toggle" onclick="toggleFilters()">
+            <i class="bi bi-funnel"></i> Фильтры
+        </button>
+        <button class="btn btn-sm btn-outline-primary" onclick="loadData()"><i
+                class="bi bi-arrow-clockwise"></i></button>
+    </div>
+</div>
+
+<!-- Filter Panel -->
+<div class="filter-panel" id="filter-panel">
+    <div class="row g-2 mb-2">
+        <div class="col-md-3">
+            <label>Домен</label>
+            <select class="form-select form-select-sm" id="f-domain">
+                <option value="">Все домены</option>
+                {% for d in domains %}
+                <option value="{{ d.domain }}">{{ d.domain }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label>Метод</label>
+            <select class="form-select form-select-sm" id="f-method">
+                <option value="">Все</option>
+                <option>GET</option>
+                <option>POST</option>
+                <option>PUT</option>
+                <option>DELETE</option>
+                <option>HEAD</option>
+                <option>PATCH</option>
+                <option>OPTIONS</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label>Статус</label>
+            <select class="form-select form-select-sm" id="f-status">
+                <option value="">Все</option>
+                <option value="2xx">2xx Успех</option>
+                <option value="3xx">3xx Редирект</option>
+                <option value="4xx">4xx Клиент</option>
+                <option value="5xx">5xx Сервер</option>
+                <option value="200">200</option>
+                <option value="301">301</option>
+                <option value="302">302</option>
+                <option value="304">304</option>
+                <option value="400">400</option>
+                <option value="401">401</option>
+                <option value="403">403</option>
+                <option value="404">404</option>
+                <option value="500">500</option>
+                <option value="502">502</option>
+                <option value="503">503</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label>Протокол</label>
+            <select class="form-select form-select-sm" id="f-scheme">
+                <option value="">Все</option>
+                <option value="https">HTTPS</option>
+                <option value="http">HTTP</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label>IP-адрес</label>
+            <input class="form-control form-control-sm" id="f-ip" placeholder="185.100.…">
+        </div>
+    </div>
+    <div class="row g-2 mb-2">
+        <div class="col-md-3">
+            <label>URI (содержит)</label>
+            <input class="form-control form-control-sm" id="f-uri" placeholder="/api/users">
+        </div>
+        <div class="col-md-3">
+            <label>User-Agent (содержит)</label>
+            <input class="form-control form-control-sm" id="f-ua" placeholder="Chrome, bot…">
+        </div>
+        <div class="col-md-2">
+            <label>Время ≥ (сек)</label>
+            <input class="form-control form-control-sm" type="number" step="0.01" id="f-min-time" placeholder="0.5">
+        </div>
+        <div class="col-md-2">
+            <label>Время ≤ (сек)</label>
+            <input class="form-control form-control-sm" type="number" step="0.01" id="f-max-time" placeholder="5.0">
+        </div>
+        <div class="col-md-2">
+            <label>Размер ≥ (байт)</label>
+            <input class="form-control form-control-sm" type="number" id="f-min-bytes" placeholder="1024">
+        </div>
+    </div>
+    <div class="row g-2 mb-2">
+        <div class="col-md-3">
+            <label>С (от)</label>
+            <input class="form-control form-control-sm" type="datetime-local" id="f-since">
+        </div>
+        <div class="col-md-3">
+            <label>По (до)</label>
+            <input class="form-control form-control-sm" type="datetime-local" id="f-until">
+        </div>
+        <div class="col-md-2">
+            <label>Записей/стр</label>
+            <select class="form-select form-select-sm" id="f-per-page">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+            </select>
+        </div>
+        <div class="col-md-4 d-flex align-items-end gap-2">
+            <button class="btn btn-sm btn-primary flex-grow-1" onclick="applyFilters()">
+                <i class="bi bi-search"></i> Применить
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="resetFilters()">
+                <i class="bi bi-x-circle"></i> Сброс
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Info Bar -->
+<div class="d-flex justify-content-between align-items-center mb-2 info-bar">
+    <div>
+        <span class="text-muted">Найдено:</span>
+        <strong id="info-total">—</strong>
+        <span class="text-muted ms-2">Стр.</span>
+        <strong id="info-page">—</strong>/<strong id="info-pages">—</strong>
+    </div>
+    <div id="active-filters" class="d-flex gap-1 flex-wrap"></div>
+</div>
+
+<!-- Table -->
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-sm table-hover req-table mb-0">
+            <thead class="bg-light">
+                <tr>
+                    <th data-sort="timestamp" class="sorted">Время <i class="bi bi-sort-down sort-icon"></i></th>
+                    <th data-sort="method">Метод <i class="bi bi-sort-down sort-icon"></i></th>
+                    <th data-sort="status">Код <i class="bi bi-sort-down sort-icon"></i></th>
+                    <th data-sort="server_name">Домен <i class="bi bi-sort-down sort-icon"></i></th>
+                    <th data-sort="uri">URI <i class="bi bi-sort-down sort-icon"></i></th>
+                    <th data-sort="remote_addr">IP <i class="bi bi-sort-down sort-icon"></i></th>
+                    <th data-sort="request_time">Время отв. <i class="bi bi-sort-down sort-icon"></i></th>
+                    <th data-sort="body_bytes">Размер <i class="bi bi-sort-down sort-icon"></i></th>
+                    <th data-sort="scheme">Схема <i class="bi bi-sort-down sort-icon"></i></th>
+                    <th>User-Agent</th>
+                </tr>
+            </thead>
+            <tbody id="req-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Pagination -->
+<nav class="mt-3 d-flex justify-content-center" id="pagination-nav">
+    <ul class="pagination pagination-sm" id="pagination"></ul>
+</nav>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // ─── State ─────────────────────────────────
+    let currentPage = 1;
+    let currentSort = 'timestamp';
+    let currentOrder = 'desc';
+
+    const SCOLORS = { '200': '#198754', '201': '#198754', '204': '#198754', '301': '#6c757d', '302': '#6c757d', '304': '#adb5bd', '400': '#fd7e14', '401': '#fd7e14', '403': '#dc3545', '404': '#ffc107', '500': '#dc3545', '502': '#dc3545', '503': '#dc3545' };
+    const MCOLORS = { 'GET': '#0d6efd', 'POST': '#198754', 'PUT': '#fd7e14', 'DELETE': '#dc3545', 'HEAD': '#6c757d', 'PATCH': '#6f42c1', 'OPTIONS': '#20c997' };
+    function sc(s) { return SCOLORS[String(s)] || '#6c757d'; }
+    function fB(b) { if (!b) return '—'; if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(1) + ' KB'; return (b / 1048576).toFixed(1) + ' MB'; }
+    function fDT(iso) { if (!iso) return '—'; const d = new Date(iso); return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }); }
+    function trunc(s, n) { if (!s) return '—'; return s.length > n ? s.substring(0, n) + '…' : s; }
+
+    // ─── Build URL ─────────────────────────────
+    function buildURL() {
+        const p = new URLSearchParams();
+        p.set('page', currentPage);
+        p.set('per_page', document.getElementById('f-per-page').value);
+        p.set('sort', currentSort);
+        p.set('order', currentOrder);
+
+        const filters = [
+            ['domain', 'f-domain'], ['method', 'f-method'], ['status', 'f-status'],
+            ['scheme', 'f-scheme'], ['ip', 'f-ip'], ['uri', 'f-uri'], ['ua', 'f-ua'],
+            ['min_time', 'f-min-time'], ['max_time', 'f-max-time'], ['min_bytes', 'f-min-bytes'],
+            ['since', 'f-since'], ['until', 'f-until'],
+        ];
+        filters.forEach(([key, id]) => {
+            const v = document.getElementById(id).value.trim();
+            if (v) p.set(key, v);
+        });
+        return '/api/logs/requests?' + p.toString();
+    }
+
+    // ─── Load Data ─────────────────────────────
+    async function loadData() {
+        try {
+            const r = await fetch(buildURL());
+            const d = await r.json();
+            renderTable(d);
+            renderPagination(d);
+            updateInfoBar(d);
+        } catch (e) { console.error('Load error:', e); }
+    }
+
+    function renderTable(d) {
+        const tbody = document.getElementById('req-body');
+        if (!d.data.length) {
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4"><i class="bi bi-inbox"></i> Нет запросов по заданным фильтрам</td></tr>';
+            return;
+        }
+        tbody.innerHTML = d.data.map(r => `<tr class="req-row">
+        <td class="time-cell">${fDT(r.timestamp)}</td>
+        <td><span class="badge badge-method" style="background:${MCOLORS[r.method] || '#6c757d'}">${r.method || '—'}</span></td>
+        <td><span class="badge badge-status" style="background:${sc(r.status)}">${r.status || '—'}</span></td>
+        <td><span class="fw-semibold small">${r.domain || '—'}</span></td>
+        <td class="uri-cell" title="${r.uri || ''}"><code class="small">${trunc(r.uri, 40)}</code></td>
+        <td><code class="small">${r.ip || '—'}</code></td>
+        <td>${r.time != null ? '<span class="badge bg-' + (r.time > 1 ? 'danger' : r.time > 0.5 ? 'warning text-dark' : 'light text-dark border') + '">' + (r.time * 1000).toFixed(0) + 'ms</span>' : '—'}</td>
+        <td class="small text-muted">${fB(r.bytes)}</td>
+        <td><span class="badge bg-${r.scheme === 'https' ? 'success' : 'secondary'} badge-status">${r.scheme || '—'}</span></td>
+        <td class="ua-cell small text-muted" title="${r.ua || ''}">${trunc(r.ua, 30)}</td>
+    </tr>`).join('');
+    }
+
+    function renderPagination(d) {
+        const ul = document.getElementById('pagination');
+        if (d.total_pages <= 1) { ul.innerHTML = ''; return; }
+
+        let html = '';
+        // Prev
+        html += `<li class="page-item ${d.page <= 1 ? 'disabled' : ''}"><a class="page-link" href="#" onclick="goPage(${d.page - 1});return false;">«</a></li>`;
+
+        // Pages
+        const range = 3;
+        let start = Math.max(1, d.page - range);
+        let end = Math.min(d.total_pages, d.page + range);
+
+        if (start > 1) {
+            html += `<li class="page-item"><a class="page-link" href="#" onclick="goPage(1);return false;">1</a></li>`;
+            if (start > 2) html += `<li class="page-item disabled"><span class="page-link">…</span></li>`;
+        }
+        for (let i = start; i <= end; i++) {
+            html += `<li class="page-item ${i === d.page ? 'active' : ''}"><a class="page-link" href="#" onclick="goPage(${i});return false;">${i}</a></li>`;
+        }
+        if (end < d.total_pages) {
+            if (end < d.total_pages - 1) html += `<li class="page-item disabled"><span class="page-link">…</span></li>`;
+            html += `<li class="page-item"><a class="page-link" href="#" onclick="goPage(${d.total_pages});return false;">${d.total_pages}</a></li>`;
+        }
+
+        // Next
+        html += `<li class="page-item ${d.page >= d.total_pages ? 'disabled' : ''}"><a class="page-link" href="#" onclick="goPage(${d.page + 1});return false;">»</a></li>`;
+
+        ul.innerHTML = html;
+    }
+
+    function updateInfoBar(d) {
+        document.getElementById('info-total').textContent = d.total.toLocaleString();
+        document.getElementById('info-page').textContent = d.page;
+        document.getElementById('info-pages').textContent = d.total_pages;
+
+        // Active filter badges
+        const container = document.getElementById('active-filters');
+        const labels = {
+            domain: 'Домен', method: 'Метод', status: 'Статус', scheme: 'Схема', ip: 'IP', uri: 'URI', ua: 'UA',
+            'min_time': 'Время≥', 'max_time': 'Время≤', 'min_bytes': 'Байт≥', since: 'С', until: 'По'
+        };
+        const ids = {
+            domain: 'f-domain', method: 'f-method', status: 'f-status', scheme: 'f-scheme', ip: 'f-ip',
+            uri: 'f-uri', ua: 'f-ua', min_time: 'f-min-time', max_time: 'f-max-time', min_bytes: 'f-min-bytes',
+            since: 'f-since', until: 'f-until'
+        };
+        let badges = '';
+        Object.entries(ids).forEach(([key, id]) => {
+            const v = document.getElementById(id).value.trim();
+            if (v) badges += `<span class="badge bg-primary bg-opacity-10 text-primary border">${labels[key]}: ${trunc(v, 15)} <i class="bi bi-x" style="cursor:pointer" onclick="document.getElementById('${id}').value='';applyFilters();"></i></span>`;
+        });
+        container.innerHTML = badges;
+    }
+
+    // ─── Actions ───────────────────────────────
+    function goPage(p) { currentPage = p; loadData(); window.scrollTo(0, 0); }
+    function applyFilters() { currentPage = 1; loadData(); }
+    function resetFilters() {
+        ['f-domain', 'f-method', 'f-status', 'f-scheme', 'f-ip', 'f-uri', 'f-ua', 'f-min-time', 'f-max-time', 'f-min-bytes', 'f-since', 'f-until'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
+        });
+        document.getElementById('f-per-page').value = '50';
+        currentPage = 1;
+        currentSort = 'timestamp';
+        currentOrder = 'desc';
+        loadData();
+    }
+
+    function toggleFilters() {
+        const panel = document.getElementById('filter-panel');
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // ─── Sorting ───────────────────────────────
+    document.querySelectorAll('.req-table th[data-sort]').forEach(th => {
+        th.addEventListener('click', () => {
+            const col = th.dataset.sort;
+            if (currentSort === col) {
+                currentOrder = currentOrder === 'desc' ? 'asc' : 'desc';
+            } else {
+                currentSort = col;
+                currentOrder = 'desc';
+            }
+            // Update icons
+            document.querySelectorAll('.req-table th').forEach(h => h.classList.remove('sorted'));
+            th.classList.add('sorted');
+            const icon = th.querySelector('.sort-icon');
+            icon.className = 'bi sort-icon ' + (currentOrder === 'desc' ? 'bi-sort-down' : 'bi-sort-up');
+
+            currentPage = 1;
+            loadData();
+        });
+    });
+
+    // ─── Keyboard shortcuts ────────────────────
+    document.addEventListener('keydown', e => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+        if (e.key === 'ArrowLeft') { e.preventDefault(); if (currentPage > 1) goPage(currentPage - 1); }
+        if (e.key === 'ArrowRight') { e.preventDefault(); goPage(currentPage + 1); }
+    });
+
+    // Enter key in filter inputs
+    document.querySelectorAll('#filter-panel input').forEach(inp => {
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') applyFilters(); });
+    });
+
+    // ─── Init ──────────────────────────────────
+    document.addEventListener('DOMContentLoaded', () => { loadData(); });
+</script>
+{% endblock %}

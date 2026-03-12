@@ -1,0 +1,688 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+    .filter-bar {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        background: #f8f9fa;
+        padding: 12px 0;
+        border-bottom: 1px solid #dee2e6;
+        margin: -1rem -12px 1rem;
+        padding: 12px;
+    }
+
+    .stat-card {
+        transition: transform 0.15s;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .metric-big {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.1;
+    }
+
+    .metric-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        opacity: 0.7;
+    }
+
+    .progress-thin {
+        height: 6px;
+        border-radius: 3px;
+    }
+
+    .pct-bar {
+        display: inline-block;
+        height: 8px;
+        border-radius: 4px;
+        min-width: 3px;
+    }
+
+    .badge-method {
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: .5px;
+    }
+
+    .table-stats th {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        color: #6c757d;
+    }
+
+    .table-stats td {
+        font-size: 0.85rem;
+    }
+
+    .range-btn.active {
+        background: #0d6efd !important;
+        color: white !important;
+        border-color: #0d6efd !important;
+    }
+
+    canvas {
+        max-height: 260px;
+    }
+</style>
+
+<!-- Filter Bar -->
+<div class="filter-bar rounded shadow-sm mb-3">
+    <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+        <div class="d-flex gap-1 flex-wrap">
+            <button class="btn btn-sm btn-outline-secondary range-btn" data-range="1h">1 час</button>
+            <button class="btn btn-sm btn-outline-secondary range-btn" data-range="6h">6 часов</button>
+            <button class="btn btn-sm btn-outline-secondary range-btn active" data-range="24h">24 часа</button>
+            <button class="btn btn-sm btn-outline-secondary range-btn" data-range="3d">3 дня</button>
+            <button class="btn btn-sm btn-outline-secondary range-btn" data-range="7d">Неделя</button>
+            <button class="btn btn-sm btn-outline-secondary range-btn" data-range="30d">Месяц</button>
+            <div class="vr mx-1"></div>
+            <input type="datetime-local" class="form-control form-control-sm" id="custom-since" style="width:175px;">
+            <span class="text-muted align-self-center">—</span>
+            <input type="datetime-local" class="form-control form-control-sm" id="custom-until" style="width:175px;">
+            <button class="btn btn-sm btn-primary" onclick="applyCustomRange()"><i class="bi bi-funnel"></i></button>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <select class="form-select form-select-sm" id="domain-filter" style="width:auto;" onchange="loadStats()">
+                <option value="">Все домены</option>
+                {% for d in domains %}
+                <option value="{{ d.domain }}">{{ d.domain }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-sm btn-outline-dark" onclick="loadStats()"><i
+                    class="bi bi-arrow-clockwise"></i></button>
+            <span class="badge bg-light text-dark border small" id="range-label">24 часа</span>
+        </div>
+    </div>
+</div>
+
+{% if dev_mode %}
+<div class="alert alert-warning py-1 small mb-3">
+    <i class="bi bi-exclamation-triangle"></i> <strong>DEV MODE</strong> — фейковые данные
+</div>
+{% endif %}
+
+<!-- Row 1: Big Metrics -->
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm stat-card h-100 text-center">
+            <div class="card-body py-3">
+                <div class="metric-label text-primary"><i class="bi bi-cursor-fill"></i> Всего</div>
+                <div class="metric-big text-primary" id="m-total">—</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm stat-card h-100 text-center">
+            <div class="card-body py-3">
+                <div class="metric-label text-success"><i class="bi bi-check-circle"></i> Успешных</div>
+                <div class="metric-big text-success" id="m-success">—</div>
+                <div class="small text-muted" id="m-success-pct"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm stat-card h-100 text-center">
+            <div class="card-body py-3">
+                <div class="metric-label text-warning"><i class="bi bi-exclamation-circle"></i> 4xx</div>
+                <div class="metric-big text-warning" id="m-4xx">—</div>
+                <div class="small text-muted" id="m-4xx-pct"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm stat-card h-100 text-center">
+            <div class="card-body py-3">
+                <div class="metric-label text-danger"><i class="bi bi-x-circle"></i> 5xx</div>
+                <div class="metric-big text-danger" id="m-5xx">—</div>
+                <div class="small text-muted" id="m-5xx-pct"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm stat-card h-100 text-center">
+            <div class="card-body py-3">
+                <div class="metric-label text-info"><i class="bi bi-people"></i> IP</div>
+                <div class="metric-big text-info" id="m-ips">—</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm stat-card h-100 text-center">
+            <div class="card-body py-3">
+                <div class="metric-label" style="color:#6f42c1;"><i class="bi bi-clock"></i> Avg Time</div>
+                <div class="metric-big" style="color:#6f42c1;" id="m-avg">—</div>
+                <div class="small text-muted">сек</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Success/Error Rate Bars -->
+<div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm stat-card">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between small mb-1">
+                    <span class="text-success fw-bold">Успешные <span id="bar-ok-pct"></span></span>
+                    <span class="text-danger fw-bold">Ошибки <span id="bar-err-pct"></span></span>
+                </div>
+                <div class="progress progress-thin">
+                    <div class="progress-bar bg-success" id="bar-ok" style="width:0%"></div>
+                    <div class="progress-bar bg-danger" id="bar-err" style="width:0%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm stat-card">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="small text-muted"><i class="bi bi-hdd"></i> Трафик</span>
+                    <span class="fw-bold" id="m-bytes">—</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 2: Timeline + Success/Error Lines -->
+<div class="row g-3 mb-3">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold small">
+                <i class="bi bi-graph-up"></i> Запросы по времени (Успешные / Ошибки)
+            </div>
+            <div class="card-body"><canvas id="ch-timeline" height="240"></canvas></div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold small">
+                <i class="bi bi-pie-chart"></i> HTTP статусы
+            </div>
+            <div class="card-body text-center"><canvas id="ch-statuses" height="240"></canvas></div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 3: Methods + Schemes + UA Categories + Response Time Dist -->
+<div class="row g-3 mb-3">
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 fw-semibold small"><i class="bi bi-signpost-2"></i> Методы</div>
+            <div class="card-body text-center"><canvas id="ch-methods" height="180"></canvas></div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 fw-semibold small"><i class="bi bi-shield-lock"></i> HTTP / HTTPS
+            </div>
+            <div class="card-body text-center"><canvas id="ch-schemes" height="180"></canvas></div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 fw-semibold small"><i class="bi bi-phone"></i> Клиенты</div>
+            <div class="card-body text-center"><canvas id="ch-ua" height="180"></canvas></div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 fw-semibold small"><i class="bi bi-speedometer"></i> Время ответа
+            </div>
+            <div class="card-body text-center"><canvas id="ch-rt" height="180"></canvas></div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 4: Top Domains + Top URIs -->
+<div class="row g-3 mb-3">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold small"><i class="bi bi-bar-chart"></i> Топ домены
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover table-stats mb-0">
+                        <thead>
+                            <tr>
+                                <th>Домен</th>
+                                <th>Запросов</th>
+                                <th>Avg Time</th>
+                                <th>Трафик</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl-domains"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold small"><i class="bi bi-link-45deg"></i> Топ URI</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover table-stats mb-0">
+                        <thead>
+                            <tr>
+                                <th>URI</th>
+                                <th>Запросов</th>
+                                <th>Avg Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl-uris"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 5: Top IPs + User Agents -->
+<div class="row g-3 mb-3">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold small"><i class="bi bi-geo-alt"></i> Топ IP-адресов
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover table-stats mb-0">
+                        <thead>
+                            <tr>
+                                <th>IP</th>
+                                <th>Запросов</th>
+                                <th>%</th>
+                                <th>Последний</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl-ips"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold small"><i class="bi bi-robot"></i> User-Agent</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover table-stats mb-0">
+                        <thead>
+                            <tr>
+                                <th>User-Agent</th>
+                                <th>Запросов</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl-ua"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 6: Slowest Requests + Error URIs -->
+<div class="row g-3 mb-3">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold small"><i class="bi bi-hourglass-split"></i> Самые
+                медленные запросы</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover table-stats mb-0">
+                        <thead>
+                            <tr>
+                                <th>Время</th>
+                                <th>Домен</th>
+                                <th>URI</th>
+                                <th>ms</th>
+                                <th>Статус</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl-slow"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold small"><i class="bi bi-bug"></i> Самые проблемные URI
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover table-stats mb-0">
+                        <thead>
+                            <tr>
+                                <th>URI</th>
+                                <th>Всего</th>
+                                <th>Ошибки</th>
+                                <th>% ошибок</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl-err-uri"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 7: Avg Response Time by Domain + Recent Errors -->
+<div class="row g-3 mb-3">
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold small"><i class="bi bi-speedometer2"></i> Время ответа
+                по доменам</div>
+            <div class="card-body"><canvas id="ch-avg-domain" height="200"></canvas></div>
+        </div>
+    </div>
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold small d-flex justify-content-between">
+                <span><i class="bi bi-exclamation-diamond"></i> Последние ошибки</span>
+                <span class="badge bg-danger" id="err-cnt">0</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height:300px;overflow-y:auto;">
+                    <table class="table table-sm table-hover table-stats mb-0">
+                        <thead class="sticky-top bg-white">
+                            <tr>
+                                <th>Время</th>
+                                <th>Домен</th>
+                                <th>Метод</th>
+                                <th>URI</th>
+                                <th>Код</th>
+                                <th>IP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl-errors"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 8: Stream Stats -->
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm bg-dark text-light">
+            <div class="card-header border-0 fw-semibold small"><i class="bi bi-broadcast"></i> Stream TCP/UDP
+                статистика</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Порт</th>
+                                <th>Сессий</th>
+                                <th>Bytes IN</th>
+                                <th>Bytes OUT</th>
+                                <th>Avg Session</th>
+                                <th>Max Session</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbl-streams"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+    // ─── Globals ───────────────────────────────
+    let currentRange = '24h';
+    const SCOLORS = { '200': '#198754', '301': '#6c757d', '302': '#6c757d', '304': '#adb5bd', '400': '#fd7e14', '401': '#fd7e14', '403': '#dc3545', '404': '#ffc107', '500': '#dc3545', '502': '#dc3545', '503': '#dc3545' };
+    const METHOD_COLORS = { 'GET': '#0d6efd', 'POST': '#198754', 'PUT': '#fd7e14', 'DELETE': '#dc3545', 'HEAD': '#6c757d', 'PATCH': '#6f42c1', 'OPTIONS': '#20c997' };
+    const RT_COLORS = ['#198754', '#0dcaf0', '#ffc107', '#dc3545'];
+    const UA_COLORS = { 'Desktop': '#0d6efd', 'Mobile': '#6f42c1', 'Bot': '#dc3545', 'API/CLI': '#fd7e14', 'Other': '#6c757d' };
+    function sc(s) { return SCOLORS[s] || '#6c757d'; }
+    function fB(b) { if (b < 1024) return b + ' B'; if (b < 1048576) return (b / 1024).toFixed(1) + ' KB'; if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB'; return (b / 1073741824).toFixed(2) + ' GB'; }
+    function fT(iso) { if (!iso) return '—'; const d = new Date(iso); return d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); }
+    function fH(iso) { if (!iso) return '—'; const d = new Date(iso); return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
+    function trunc(s, n) { return s.length > n ? s.substring(0, n) + '…' : s; }
+
+    // ─── Charts ────────────────────────────────
+    let chTimeline, chStatuses, chMethods, chSchemes, chUA, chRT, chAvgDomain;
+
+    function initCharts() {
+        const lineOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 11 } } } }, scales: { x: { ticks: { maxTicksLimit: 12, font: { size: 10 }, callback: function (v) { const l = this.getLabelForValue(v); return l ? String(l).split(' ')[1] || l : v; } } }, y: { beginAtZero: true } } };
+        const doughOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } };
+
+        chTimeline = new Chart(document.getElementById('ch-timeline'), {
+            type: 'line', data: {
+                labels: [], datasets: [
+                    { label: 'Успешные', data: [], borderColor: '#198754', backgroundColor: 'rgba(25,135,84,.08)', fill: true, tension: .3, pointRadius: 1, borderWidth: 2 },
+                    { label: 'Ошибки', data: [], borderColor: '#dc3545', backgroundColor: 'rgba(220,53,69,.08)', fill: true, tension: .3, pointRadius: 1, borderWidth: 2 },
+                ]
+            }, options: lineOpts
+        });
+        chStatuses = new Chart(document.getElementById('ch-statuses'), { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] }, options: doughOpts });
+        chMethods = new Chart(document.getElementById('ch-methods'), { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] }, options: doughOpts });
+        chSchemes = new Chart(document.getElementById('ch-schemes'), { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: ['#0d6efd', '#198754', '#6c757d'] }] }, options: doughOpts });
+        chUA = new Chart(document.getElementById('ch-ua'), { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] }, options: doughOpts });
+        chRT = new Chart(document.getElementById('ch-rt'), { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: RT_COLORS }] }, options: doughOpts });
+        chAvgDomain = new Chart(document.getElementById('ch-avg-domain'), {
+            type: 'bar', data: {
+                labels: [], datasets: [
+                    { label: 'Avg (s)', data: [], backgroundColor: '#6f42c1', borderRadius: 4 },
+                    { label: 'Max (s)', data: [], backgroundColor: 'rgba(111,66,193,.3)', borderRadius: 4 },
+                ]
+            }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } }, scales: { x: { ticks: { font: { size: 10 } } }, y: { beginAtZero: true } } }
+        });
+    }
+
+    function buildURL() {
+        let url = '/api/stats/full?range=' + currentRange;
+        const domain = document.getElementById('domain-filter').value;
+        if (domain) url += '&domain=' + encodeURIComponent(domain);
+        const since = document.getElementById('custom-since').value;
+        const until = document.getElementById('custom-until').value;
+        if (currentRange === 'custom' && since && until) {
+            url = '/api/stats/full?range=custom&since=' + since + '&until=' + until;
+            if (domain) url += '&domain=' + encodeURIComponent(domain);
+        }
+        return url;
+    }
+
+    async function loadStats() {
+        try {
+            const r = await fetch(buildURL());
+            const d = await r.json();
+            renderAll(d);
+        } catch (e) { console.error('Stats error:', e); }
+    }
+
+    function renderAll(d) {
+        const o = d.overview;
+        // Metrics
+        document.getElementById('m-total').textContent = o.total.toLocaleString();
+        document.getElementById('m-success').textContent = o.success.toLocaleString();
+        document.getElementById('m-success-pct').textContent = o.success_rate + '%';
+        document.getElementById('m-4xx').textContent = o.errors_4xx.toLocaleString();
+        document.getElementById('m-4xx-pct').textContent = o.total ? (o.errors_4xx / o.total * 100).toFixed(1) + '%' : '';
+        document.getElementById('m-5xx').textContent = o.errors_5xx.toLocaleString();
+        document.getElementById('m-5xx-pct').textContent = o.total ? (o.errors_5xx / o.total * 100).toFixed(1) + '%' : '';
+        document.getElementById('m-ips').textContent = o.unique_ips.toLocaleString();
+        document.getElementById('m-avg').textContent = o.avg_response_time.toFixed(3);
+        document.getElementById('m-bytes').textContent = fB(o.total_bytes);
+
+        // Success/Error bar
+        document.getElementById('bar-ok').style.width = o.success_rate + '%';
+        document.getElementById('bar-err').style.width = o.error_rate + '%';
+        document.getElementById('bar-ok-pct').textContent = o.success_rate + '%';
+        document.getElementById('bar-err-pct').textContent = o.error_rate + '%';
+
+        // Timeline (success + errors)
+        const allLabels = d.timeline.labels;
+        const okMap = Object.fromEntries(d.timeline_ok.labels.map((l, i) => [l, d.timeline_ok.data[i]]));
+        const errMap = Object.fromEntries(d.timeline_err.labels.map((l, i) => [l, d.timeline_err.data[i]]));
+        chTimeline.data.labels = allLabels;
+        chTimeline.data.datasets[0].data = allLabels.map(l => okMap[l] || 0);
+        chTimeline.data.datasets[1].data = allLabels.map(l => errMap[l] || 0);
+        chTimeline.update();
+
+        // Statuses
+        chStatuses.data.labels = d.status_codes.labels;
+        chStatuses.data.datasets[0].data = d.status_codes.data;
+        chStatuses.data.datasets[0].backgroundColor = d.status_codes.labels.map(sc);
+        chStatuses.update();
+
+        // Methods
+        chMethods.data.labels = d.methods.labels;
+        chMethods.data.datasets[0].data = d.methods.data;
+        chMethods.data.datasets[0].backgroundColor = d.methods.labels.map(m => METHOD_COLORS[m] || '#6c757d');
+        chMethods.update();
+
+        // Schemes
+        chSchemes.data.labels = d.schemes.labels;
+        chSchemes.data.datasets[0].data = d.schemes.data;
+        chSchemes.update();
+
+        // UA Categories
+        chUA.data.labels = d.ua_categories.labels;
+        chUA.data.datasets[0].data = d.ua_categories.data;
+        chUA.data.datasets[0].backgroundColor = d.ua_categories.labels.map(c => UA_COLORS[c] || '#6c757d');
+        chUA.update();
+
+        // Response time distribution
+        chRT.data.labels = d.response_time_dist.labels;
+        chRT.data.datasets[0].data = d.response_time_dist.data;
+        chRT.update();
+
+        // Avg by domain bar
+        chAvgDomain.data.labels = d.avg_by_domain.map(r => r.domain);
+        chAvgDomain.data.datasets[0].data = d.avg_by_domain.map(r => r.avg_time);
+        chAvgDomain.data.datasets[1].data = d.avg_by_domain.map(r => r.max_time);
+        chAvgDomain.update();
+
+        // Top Domains table
+        document.getElementById('tbl-domains').innerHTML = d.top_domains.length ?
+            d.top_domains.map(r => `<tr>
+            <td><a href="/statistics?domain=${encodeURIComponent(r.domain)}" class="text-decoration-none fw-semibold">${r.domain}</a></td>
+            <td><span class="badge bg-primary">${r.requests}</span></td>
+            <td>${r.avg_time}s</td>
+            <td>${fB(r.bytes)}</td>
+        </tr>`).join('') : '<tr><td colspan="4" class="text-center text-muted small">Нет данных</td></tr>';
+
+        // Top URIs
+        document.getElementById('tbl-uris').innerHTML = d.top_uris.length ?
+            d.top_uris.map(r => `<tr>
+            <td class="text-truncate" style="max-width:250px;"><code class="small">${r.uri}</code></td>
+            <td><span class="badge bg-secondary">${r.requests}</span></td>
+            <td>${r.avg_time}s</td>
+        </tr>`).join('') : '<tr><td colspan="3" class="text-center text-muted small">Нет данных</td></tr>';
+
+        // Top IPs
+        document.getElementById('tbl-ips').innerHTML = d.top_ips.length ?
+            d.top_ips.map(r => `<tr>
+            <td><code>${r.ip}</code></td>
+            <td><span class="badge bg-primary">${r.requests}</span></td>
+            <td><span class="pct-bar bg-primary" style="width:${Math.min(r.pct * 2, 100)}px;"></span> ${r.pct}%</td>
+            <td class="small text-muted">${fT(r.last_seen)}</td>
+        </tr>`).join('') : '<tr><td colspan="4" class="text-center text-muted small">Нет данных</td></tr>';
+
+        // User Agents
+        document.getElementById('tbl-ua').innerHTML = d.user_agents.length ?
+            d.user_agents.map(r => `<tr>
+            <td class="text-truncate small" style="max-width:300px;" title="${r.agent}">${trunc(r.agent, 60)}</td>
+            <td><span class="badge bg-secondary">${r.requests}</span></td>
+        </tr>`).join('') : '<tr><td colspan="2" class="text-center text-muted small">Нет данных</td></tr>';
+
+        // Slowest
+        document.getElementById('tbl-slow').innerHTML = d.slowest.length ?
+            d.slowest.map(r => `<tr>
+            <td class="small">${fH(r.time)}</td>
+            <td>${r.domain}</td>
+            <td class="text-truncate small" style="max-width:180px;"><code>${r.uri}</code></td>
+            <td><span class="badge bg-warning text-dark">${(r.request_time * 1000).toFixed(0)}ms</span></td>
+            <td><span class="badge" style="background:${sc(String(r.status))}">${r.status}</span></td>
+        </tr>`).join('') : '<tr><td colspan="5" class="text-center text-muted small">Нет данных</td></tr>';
+
+        // Error URIs
+        document.getElementById('tbl-err-uri').innerHTML = d.error_uris.length ?
+            d.error_uris.map(r => `<tr>
+            <td class="text-truncate small" style="max-width:220px;"><code>${r.uri}</code></td>
+            <td>${r.total}</td>
+            <td><span class="badge bg-danger">${r.errors}</span></td>
+            <td>
+                <div class="d-flex align-items-center gap-1">
+                    <div class="progress progress-thin flex-grow-1"><div class="progress-bar bg-danger" style="width:${r.error_rate}%"></div></div>
+                    <span class="small">${r.error_rate}%</span>
+                </div>
+            </td>
+        </tr>`).join('') : '<tr><td colspan="4" class="text-center text-muted small">Нет проблемных URI 🎉</td></tr>';
+
+        // Recent Errors
+        document.getElementById('err-cnt').textContent = d.recent_errors.length;
+        document.getElementById('tbl-errors').innerHTML = d.recent_errors.length ?
+            d.recent_errors.map(r => `<tr>
+            <td class="small">${fT(r.time)}</td>
+            <td>${r.domain}</td>
+            <td><span class="badge badge-method" style="background:${METHOD_COLORS[r.method] || '#6c757d'}">${r.method}</span></td>
+            <td class="text-truncate small" style="max-width:180px;" title="${r.uri}"><code>${trunc(r.uri, 35)}</code></td>
+            <td><span class="badge" style="background:${sc(String(r.status))}">${r.status}</span></td>
+            <td><code class="small">${r.ip}</code></td>
+        </tr>`).join('') : '<tr><td colspan="6" class="text-center text-muted small">Ошибок нет 🎉</td></tr>';
+
+        // Streams
+        document.getElementById('tbl-streams').innerHTML = d.streams.length ?
+            d.streams.map(r => `<tr>
+            <td><span class="badge bg-info">${r.port}</span></td>
+            <td>${r.sessions}</td>
+            <td>${fB(r.bytes_in)}</td>
+            <td>${fB(r.bytes_out)}</td>
+            <td>${r.avg_session}s</td>
+            <td>${r.max_session}s</td>
+        </tr>`).join('') : '<tr><td colspan="6" class="text-center opacity-50 small">Нет stream-данных</td></tr>';
+    }
+
+    // ─── Range Buttons ─────────────────────────
+    document.querySelectorAll('.range-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentRange = btn.dataset.range;
+            document.getElementById('range-label').textContent = btn.textContent;
+            loadStats();
+        });
+    });
+
+    function applyCustomRange() {
+        const since = document.getElementById('custom-since').value;
+        const until = document.getElementById('custom-until').value;
+        if (!since || !until) { alert('Укажите обе даты'); return; }
+        document.querySelectorAll('.range-btn').forEach(b => b.classList.remove('active'));
+        currentRange = 'custom';
+        document.getElementById('range-label').textContent = 'Кастомный';
+        loadStats();
+    }
+
+    // Auto-set domain filter from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('domain')) {
+        document.getElementById('domain-filter').value = urlParams.get('domain');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initCharts();
+        loadStats();
+        setInterval(loadStats, 30000);
+    });
+</script>
+{% endblock %}

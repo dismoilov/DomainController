@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0"><i class="bi bi-speedometer2"></i> Dashboard</h1>
+    <div class="d-flex gap-2 align-items-center">
+        <span class="badge bg-light text-dark border" id="last-update">Загрузка...</span>
+        <button class="btn btn-sm btn-outline-secondary" onclick="loadAll()"><i
+                class="bi bi-arrow-clockwise"></i></button>
+    </div>
+</div>
+
+{% if dev_mode %}
+<div class="alert alert-warning alert-dismissible fade show py-2 small" role="alert">
+    <i class="bi bi-exclamation-triangle"></i> <strong>DEV MODE</strong> — используются фейковые данные для
+    тестирования.
+    <button type="button" class="btn-close btn-close-sm" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+<!-- Counter Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="text-muted small mb-1"><i class="bi bi-cursor-fill text-primary"></i> Запросов (24ч)</div>
+                <div class="fs-2 fw-bold text-primary" id="stat-total">—</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="text-muted small mb-1"><i class="bi bi-people-fill text-info"></i> Уникальных IP</div>
+                <div class="fs-2 fw-bold text-info" id="stat-ips">—</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="text-muted small mb-1"><i class="bi bi-exclamation-triangle-fill text-danger"></i> Ошибки
+                    4xx/5xx</div>
+                <div class="fs-2 fw-bold" id="stat-errors" style="color:#dc3545;">—</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="text-muted small mb-1"><i class="bi bi-clock-fill text-success"></i> Avg Response</div>
+                <div class="fs-2 fw-bold text-success" id="stat-avg-time">—</div>
+                <div class="text-muted small">сек</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stream mini-cards -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 bg-dark text-light shadow-sm h-100">
+            <div class="card-body text-center py-2">
+                <div class="small opacity-75"><i class="bi bi-broadcast"></i> Stream сессии</div>
+                <div class="fs-4 fw-bold" id="stat-stream-sessions">—</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 bg-dark text-light shadow-sm h-100">
+            <div class="card-body text-center py-2">
+                <div class="small opacity-75"><i class="bi bi-arrow-down"></i> Stream IN</div>
+                <div class="fs-4 fw-bold" id="stat-stream-in">—</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 bg-dark text-light shadow-sm h-100">
+            <div class="card-body text-center py-2">
+                <div class="small opacity-75"><i class="bi bi-arrow-up"></i> Stream OUT</div>
+                <div class="fs-4 fw-bold" id="stat-stream-out">—</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-lg-3">
+        <div class="card border-0 bg-dark text-light shadow-sm h-100">
+            <div class="card-body text-center py-2">
+                <div class="small opacity-75"><i class="bi bi-diagram-3"></i> Маршрутов</div>
+                <div class="fs-4 fw-bold"><span id="stat-domains">—</span> + <span id="stat-streams">—</span></div>
+                <div class="small opacity-50">домены + stream</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 1: Timeline + Status Codes -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold">
+                <i class="bi bi-graph-up"></i> Запросы по часам (24ч)
+            </div>
+            <div class="card-body">
+                <canvas id="chart-timeline" height="220"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold">
+                <i class="bi bi-pie-chart"></i> HTTP статусы
+            </div>
+            <div class="card-body text-center">
+                <canvas id="chart-statuses" height="220"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 2: Top Domains + Top IPs -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold">
+                <i class="bi bi-bar-chart"></i> Топ домены
+            </div>
+            <div class="card-body">
+                <canvas id="chart-domains" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold">
+                <i class="bi bi-geo-alt"></i> Топ IP-адресов
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>IP</th>
+                                <th>Запросов</th>
+                                <th>Последний</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-top-ips">
+                            <tr>
+                                <td colspan="3" class="text-center text-muted small">Загрузка...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Errors -->
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold d-flex justify-content-between">
+                <span><i class="bi bi-bug"></i> Последние ошибки (4xx/5xx)</span>
+                <span class="badge bg-danger" id="errors-count">0</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Время</th>
+                                <th>Домен</th>
+                                <th>URI</th>
+                                <th>Статус</th>
+                                <th>IP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-errors">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted small">Загрузка...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+    const STATUS_COLORS = {
+        '200': '#198754', '301': '#6c757d', '302': '#6c757d', '304': '#adb5bd',
+        '400': '#fd7e14', '401': '#fd7e14', '403': '#dc3545', '404': '#ffc107',
+        '500': '#dc3545', '502': '#dc3545', '503': '#dc3545',
+    };
+    function getStatusColor(s) { return STATUS_COLORS[s] || '#6c757d'; }
+    function fmtBytes(b) {
+        if (b < 1024) return b + ' B';
+        if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+        if (b < 1073741824) return (b / 1048576).toFixed(1) + ' MB';
+        return (b / 1073741824).toFixed(2) + ' GB';
+    }
+    function fmtTime(iso) {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Charts
+    let chartTimeline, chartStatuses, chartDomains;
+
+    function initCharts() {
+        const tlCtx = document.getElementById('chart-timeline').getContext('2d');
+        chartTimeline = new Chart(tlCtx, {
+            type: 'line',
+            data: {
+                labels: [], datasets: [{
+                    label: 'Запросы',
+                    data: [],
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13,110,253,0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 2,
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { maxTicksLimit: 12, callback: function (v) { const l = this.getLabelForValue(v); return l ? String(l).split(' ')[1] || l : v; } } },
+                    y: { beginAtZero: true }
+                }
+            }
+        });
+
+        const stCtx = document.getElementById('chart-statuses').getContext('2d');
+        chartStatuses = new Chart(stCtx, {
+            type: 'doughnut',
+            data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } }
+            }
+        });
+
+        const dmCtx = document.getElementById('chart-domains').getContext('2d');
+        chartDomains = new Chart(dmCtx, {
+            type: 'bar',
+            data: {
+                labels: [], datasets: [{
+                    label: 'Запросы',
+                    data: [],
+                    backgroundColor: '#6f42c1',
+                    borderRadius: 4,
+                }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true } }
+            }
+        });
+    }
+
+    async function loadOverview() {
+        const r = await fetch('/api/stats/overview');
+        const d = await r.json();
+        document.getElementById('stat-total').textContent = d.total_requests.toLocaleString();
+        document.getElementById('stat-ips').textContent = d.unique_ips.toLocaleString();
+        document.getElementById('stat-errors').textContent = d.errors_4xx_5xx.toLocaleString();
+        document.getElementById('stat-avg-time').textContent = d.avg_response_time.toFixed(3);
+        document.getElementById('stat-stream-sessions').textContent = d.total_stream_sessions.toLocaleString();
+        document.getElementById('stat-stream-in').textContent = fmtBytes(d.stream_bytes_in);
+        document.getElementById('stat-stream-out').textContent = fmtBytes(d.stream_bytes_out);
+        document.getElementById('stat-domains').textContent = d.domain_count;
+        document.getElementById('stat-streams').textContent = d.stream_count;
+    }
+
+    async function loadTimeline() {
+        const r = await fetch('/api/stats/timeline?hours=24');
+        const d = await r.json();
+        chartTimeline.data.labels = d.labels;
+        chartTimeline.data.datasets[0].data = d.data;
+        chartTimeline.update();
+    }
+
+    async function loadStatusCodes() {
+        const r = await fetch('/api/stats/status-codes');
+        const d = await r.json();
+        chartStatuses.data.labels = d.labels;
+        chartStatuses.data.datasets[0].data = d.data;
+        chartStatuses.data.datasets[0].backgroundColor = d.labels.map(getStatusColor);
+        chartStatuses.update();
+    }
+
+    async function loadDomains() {
+        const r = await fetch('/api/stats/domains');
+        const d = await r.json();
+        chartDomains.data.labels = d.slice(0, 8).map(i => i.domain);
+        chartDomains.data.datasets[0].data = d.slice(0, 8).map(i => i.requests);
+        chartDomains.update();
+    }
+
+    async function loadTopIPs() {
+        const r = await fetch('/api/stats/top-ips?limit=10');
+        const d = await r.json();
+        const tbody = document.getElementById('table-top-ips');
+        if (!d.length) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted small">Нет данных</td></tr>';
+            return;
+        }
+        tbody.innerHTML = d.map(i => `<tr>
+        <td><code>${i.ip}</code></td>
+        <td><span class="badge bg-primary">${i.requests}</span></td>
+        <td class="small text-muted">${fmtTime(i.last_seen)}</td>
+    </tr>`).join('');
+    }
+
+    async function loadErrors() {
+        const r = await fetch('/api/stats/errors?limit=15');
+        const d = await r.json();
+        document.getElementById('errors-count').textContent = d.length;
+        const tbody = document.getElementById('table-errors');
+        if (!d.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted small">Ошибок нет 🎉</td></tr>';
+            return;
+        }
+        tbody.innerHTML = d.map(i => `<tr>
+        <td class="small">${fmtTime(i.time)}</td>
+        <td>${i.domain}</td>
+        <td class="small text-truncate" style="max-width:200px;">${i.uri}</td>
+        <td><span class="badge" style="background:${getStatusColor(String(i.status))}">${i.status}</span></td>
+        <td><code class="small">${i.ip}</code></td>
+    </tr>`).join('');
+    }
+
+    async function loadAll() {
+        try {
+            await Promise.all([loadOverview(), loadTimeline(), loadStatusCodes(), loadDomains(), loadTopIPs(), loadErrors()]);
+            document.getElementById('last-update').textContent = '⟳ ' + new Date().toLocaleTimeString('ru-RU');
+        } catch (e) {
+            console.error('Dashboard load error:', e);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initCharts();
+        loadAll();
+        setInterval(loadAll, 30000);
+    });
+</script>
+{% endblock %}
