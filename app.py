@@ -621,7 +621,7 @@ def _parse_stream_log():
         db.session.commit()
 
 
-def _cleanup_old_logs(days: int = 7):
+def _cleanup_old_logs(days: int = 30):
     """Удалить записи старше N дней."""
     cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=days)
     AccessLog.query.filter(AccessLog.timestamp < cutoff).delete()
@@ -714,7 +714,7 @@ def start_log_reader():
                     else:
                         _parse_http_log()
                         _parse_stream_log()
-                    _cleanup_old_logs(days=7)
+                    _cleanup_old_logs(days=30)
             except Exception:
                 pass
             time.sleep(10 if DEV_MODE else 5)
