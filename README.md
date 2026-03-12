@@ -1,4 +1,4 @@
-# 🌐 Domain Controller
+d# 🌐 Domain Controller
 
 Центральная панель управления доменами и reverse-proxy на базе **Nginx + Flask + Let's Encrypt**.
 
