@@ -1494,23 +1494,29 @@ def _parse_http_log():
             _record_parser_error("http_log", line, e)
             continue
 
+        # Все varchar-поля приходится принудительно усекать в Python — иначе
+        # PostgreSQL кидает StringDataRightTruncation и весь chunk на 1000 строк
+        # отказывается коммититься (один кривой запрос → парсер встаёт).
+        # Боты шлют method длиннее 10 (бинарь, TLS-handshake над HTTP), scheme/UA с
+        # неожиданными символами и т.п. Лучше потерять "хвост" 1 строки, чем
+        # уронить весь чанк.
         entries.append(AccessLog(
             timestamp=_parse_ts(d.get("time")),
-            remote_addr=d.get("remote_addr", ""),
+            remote_addr=(d.get("remote_addr") or "")[:45],
             remote_port=_safe_int(d.get("remote_port")),
-            server_name=d.get("server_name", ""),
+            server_name=(d.get("server_name") or "")[:255],
             server_port=_safe_int(d.get("server_port")),
-            method=d.get("request_method", ""),
+            method=(d.get("request_method") or "")[:10],
             uri=(d.get("request_uri") or "")[:2048],
             status=_safe_int(d.get("status")),
             body_bytes=_safe_int(d.get("body_bytes_sent")),
             request_time=_safe_float(d.get("request_time")),
-            upstream_addr=d.get("upstream_addr", ""),
-            upstream_time=str(d.get("upstream_response_time", "")),
+            upstream_addr=(d.get("upstream_addr") or "")[:255],
+            upstream_time=str(d.get("upstream_response_time", ""))[:64],
             user_agent=(d.get("http_user_agent") or "")[:512],
             referer=(d.get("http_referer") or "")[:512],
-            scheme=d.get("scheme", ""),
-            ssl_protocol=d.get("ssl_protocol", ""),
+            scheme=(d.get("scheme") or "")[:10],
+            ssl_protocol=(d.get("ssl_protocol") or "")[:32],
         ))
 
     if entries:
@@ -1536,16 +1542,17 @@ def _parse_stream_log():
             _record_parser_error("stream_log", line, e)
             continue
 
+        # См. _parse_http_log: усекаем все varchar поля в Python для устойчивости.
         entries.append(StreamAccessLog(
             timestamp=_parse_ts(d.get("time")),
-            remote_addr=d.get("remote_addr", ""),
+            remote_addr=(d.get("remote_addr") or "")[:45],
             remote_port=_safe_int(d.get("remote_port")),
             server_port=_safe_int(d.get("server_port")),
-            protocol=d.get("protocol", "TCP"),
+            protocol=(d.get("protocol") or "TCP")[:10],
             bytes_received=_safe_int(d.get("bytes_received")),
             bytes_sent=_safe_int(d.get("bytes_sent")),
             session_time=_safe_float(d.get("session_time")),
-            upstream_addr=d.get("upstream_addr", ""),
+            upstream_addr=(d.get("upstream_addr") or "")[:255],
             status=str(d.get("status", ""))[:10],
         ))
 
