@@ -1,0 +1,19 @@
+[Unit]
+Description=Backup DomainController SQLite database
+After=domain-controller.service
+Requires=domain-controller.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/domain-controller/deploy/backup.sh
+Nice=10
+IOSchedulingClass=idle
+User=root
+Group=root
+
+# Немного hardening даже для oneshot — директории ограничены.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/domain-controller/backups
+ProtectHome=yes

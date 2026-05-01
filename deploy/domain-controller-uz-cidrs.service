@@ -1,0 +1,17 @@
+[Unit]
+Description=Refresh Uzbekistan CIDR allowlist for fail2ban
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/domain-controller/deploy/apply-uz-cidrs.sh
+Nice=10
+IOSchedulingClass=idle
+User=root
+Group=root
+
+# Минимальный hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes

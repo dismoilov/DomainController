@@ -1,0 +1,24 @@
+# fail2ban jail для 404-флуда на проксируемых доменах.
+# Разместить как /etc/fail2ban/jail.d/dc-404-flood.conf
+#
+# Порог: 50 четырёхсоток с одного IP за 5 минут → iptables ban на 1 час.
+# Это ловит медленные брутфорсы директорий, но не трогает реальных юзеров,
+# которые опечатались в URL (1-2 четырёхсотки в день — ниже порога).
+#
+# ignoreip перегенерируется скриптом deploy/apply-uz-cidrs.sh — туда
+# добавляется весь IP-пул Узбекистана с ipdeny.com, чтобы CGNAT UzTelecom/
+# Beeline/Ucell/Sarkor никогда не банился случайно.
+
+[dc-404-flood]
+enabled   = true
+port      = http,https
+filter    = dc-404-flood
+logpath   = /var/log/nginx/dc_access.json
+maxretry  = 50
+findtime  = 300
+bantime   = 3600
+banaction = iptables-multiport
+
+# Базовый allowlist — localhost + RFC1918. UZ-пул добавляется отдельно
+# через /etc/fail2ban/jail.d/dc-uz-ignore.conf (генерируется apply-uz-cidrs.sh).
+ignoreip  = 127.0.0.1/8 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16

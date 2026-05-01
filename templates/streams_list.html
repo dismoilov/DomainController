@@ -81,12 +81,15 @@
                     href="{{ url_for('streams_edit', stream_id=s.id) }}">
                     <i class="bi bi-pencil"></i> Изменить
                 </a>
+                {% if session.get('role') == 'admin' %}
                 <form action="{{ url_for('streams_delete', stream_id=s.id) }}" method="post" class="flex-fill"
                     onsubmit="return confirm('Удалить «{{ s.name }}» (порт {{ s.listen_port }})?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <button class="btn btn-sm btn-outline-danger w-100" type="submit">
                         <i class="bi bi-trash"></i> Удалить
                     </button>
                 </form>
+                {% endif %}
             </div>
         </div>
     </div>

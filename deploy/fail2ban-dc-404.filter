@@ -1,0 +1,12 @@
+# Ловим 404-флуд: JSON-строка из /var/log/nginx/dc_access.json со status=404.
+# Признак медленного брутфорса директорий — 50+ разных 404 с одного IP за 5 мин.
+# При попадании в jail-порог fail2ban банит IP в iptables.
+#
+# Разместить как /etc/fail2ban/filter.d/dc-404-flood.conf
+
+[Definition]
+failregex = "remote_addr":"<HOST>"[^\n]*?"status":404
+ignoreregex =
+
+# datepattern: время в nginx log_format dc_json — ISO 8601 с таймзоной
+datepattern = "time":"%%Y-%%m-%%dT%%H:%%M:%%S%%z"

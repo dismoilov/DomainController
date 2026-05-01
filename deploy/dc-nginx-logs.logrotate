@@ -1,0 +1,25 @@
+# Logrotate для JSON-логов nginx, которые парсит DomainController.
+# Разместить как /etc/logrotate.d/dc-nginx-logs
+#
+# Парсер DomainController (_read_new_lines) корректно детектирует ротацию
+# по смене inode и truncate — data в log_checkpoints обновляется и чтение
+# продолжается с позиции 0 нового файла.
+
+/var/log/nginx/dc_access.json /var/log/nginx/dc_stream.json {
+    daily
+    size 100M
+    rotate 14
+    missingok
+    notifempty
+    compress
+    delaycompress
+    create 0640 www-data adm
+    sharedscripts
+    postrotate
+        # `nginx -s reopen` — штатная команда переоткрытия всех логов, включая
+        # stream access_log. USR1 работает только для http-access_log в части
+        # сборок, поэтому stream-лог продолжал писаться в удалённый inode и
+        # реальной ротации не происходило (файл рос бесконечно).
+        /usr/sbin/nginx -s reopen 2>/dev/null || true
+    endscript
+}

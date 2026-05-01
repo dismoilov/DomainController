@@ -155,6 +155,50 @@
     </div>
 </div>
 
+<!-- SSL & Backend status -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 fw-semibold d-flex justify-content-between">
+                <span><i class="bi bi-shield-check"></i> SSL-сертификаты</span>
+                <span class="badge bg-secondary" id="ssl-count">—</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 220px; overflow-y: auto;">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr><th>Домен</th><th>До истечения</th><th>Истекает</th></tr>
+                        </thead>
+                        <tbody id="table-ssl">
+                            <tr><td colspan="3" class="text-center text-muted small">Загрузка...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-white border-0 fw-semibold d-flex justify-content-between">
+                <span><i class="bi bi-heart-pulse"></i> Backend health</span>
+                <span class="badge bg-secondary" id="backends-count">—</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive" style="max-height: 220px; overflow-y: auto;">
+                    <table class="table table-sm table-hover mb-0">
+                        <thead class="table-light sticky-top">
+                            <tr><th>Домен</th><th>Target</th><th>Статус</th></tr>
+                        </thead>
+                        <tbody id="table-backends">
+                            <tr><td colspan="3" class="text-center text-muted small">Загрузка...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Recent Errors -->
 <div class="row g-3 mb-4">
     <div class="col-12">
@@ -339,9 +383,55 @@
     </tr>`).join('');
     }
 
+    async function loadSSL() {
+        const r = await fetch('/api/stats/ssl');
+        const data = await r.json();
+        document.getElementById('ssl-count').textContent = data.length;
+        const tbody = document.getElementById('table-ssl');
+        if (!data.length) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted small">Нет доменов с HTTPS</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(s => {
+            const badge = s.status === 'ok' ? 'bg-success'
+                : s.status === 'warning' ? 'bg-warning text-dark'
+                : s.status === 'critical' ? 'bg-danger'
+                : s.status === 'expired' ? 'bg-dark'
+                : 'bg-secondary';
+            const days = s.days_left === null ? '—' :
+                (s.days_left < 0 ? `истёк ${-s.days_left}д назад` : `${s.days_left} дн`);
+            const exp = s.expires_at ? new Date(s.expires_at).toLocaleDateString('ru-RU') : '—';
+            return `<tr><td><code>${s.domain}</code></td>
+                <td><span class="badge ${badge}">${days}</span></td>
+                <td class="small text-muted">${exp}</td></tr>`;
+        }).join('');
+    }
+
+    async function loadBackends() {
+        const r = await fetch('/api/stats/backends');
+        const data = await r.json();
+        const downCount = data.filter(b => b.status === 'down').length;
+        document.getElementById('backends-count').textContent = downCount ? `${downCount} down` : `${data.length} ok`;
+        document.getElementById('backends-count').className = 'badge ' + (downCount ? 'bg-danger' : 'bg-success');
+        const tbody = document.getElementById('table-backends');
+        if (!data.length) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted small">Нет маршрутов</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.map(b => {
+            const badge = b.status === 'up' ? '<span class="badge bg-success">up</span>'
+                : b.status === 'down' ? `<span class="badge bg-danger" title="${b.error || ''}">down</span>`
+                : '<span class="badge bg-secondary">—</span>';
+            return `<tr><td><code>${b.domain}</code></td>
+                <td class="small text-muted">${b.target}</td>
+                <td>${badge}</td></tr>`;
+        }).join('');
+    }
+
     async function loadAll() {
         try {
-            await Promise.all([loadOverview(), loadTimeline(), loadStatusCodes(), loadDomains(), loadTopIPs(), loadErrors()]);
+            await Promise.all([loadOverview(), loadTimeline(), loadStatusCodes(), loadDomains(),
+                loadTopIPs(), loadErrors(), loadSSL(), loadBackends()]);
             document.getElementById('last-update').textContent = '⟳ ' + new Date().toLocaleTimeString('ru-RU');
         } catch (e) {
             console.error('Dashboard load error:', e);

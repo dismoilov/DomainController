@@ -75,6 +75,12 @@
                                 class="bi bi-lightning"></i> WebSocket</span>
                         {% endif %}
 
+                        {% if not r.enable_bot_protection %}
+                        <span class="badge bg-secondary badge-proto" title="Bot protection выключен — UA-сканеры пропускаются">
+                            <i class="bi bi-robot"></i> Bot-protect OFF
+                        </span>
+                        {% endif %}
+
                         <!-- Привязанные stream-порты -->
                         {% if r.stream_routes %}
                         <div class="mt-1">
@@ -92,6 +98,7 @@
                     <!-- Действия -->
                     <div class="col-md-3 text-end">
                         <div class="btn-group btn-group-sm">
+                            {% if session.get('role') == 'admin' %}
                             <a class="btn btn-outline-secondary" href="{{ url_for('edit', route_id=r.id) }}"
                                 title="Редактировать">
                                 <i class="bi bi-pencil"></i>
@@ -100,6 +107,7 @@
                             <form action="{{ url_for('letsencrypt', route_id=r.id) }}" method="post"
                                 style="display:inline"
                                 onsubmit="return confirm('Выпустить сертификат для {{ r.domain }}?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button class="btn btn-outline-success" type="submit" title="Let's Encrypt">
                                     <i class="bi bi-shield-check"></i>
                                 </button>
@@ -107,10 +115,14 @@
 
                             <form action="{{ url_for('delete', route_id=r.id) }}" method="post" style="display:inline"
                                 onsubmit="return confirm('Удалить {{ r.domain }}?');">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <button class="btn btn-outline-danger" type="submit" title="Удалить">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>
+                            {% else %}
+                            <span class="badge bg-secondary" title="Только просмотр">viewer</span>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

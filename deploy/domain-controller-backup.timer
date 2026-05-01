@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily backup of DomainController database at 03:15 UTC
+Requires=domain-controller-backup.service
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=yes
+RandomizedDelaySec=600
+Unit=domain-controller-backup.service
+
+[Install]
+WantedBy=timers.target

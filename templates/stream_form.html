@@ -6,6 +6,7 @@
 </h1>
 
 <form method="post" class="card p-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <!-- Пресет и название -->
     <h6 class="text-muted mb-3"><i class="bi bi-gear"></i> Тип сервиса</h6>
@@ -25,7 +26,7 @@
         <div class="col-md-6">
             <label class="form-label fw-semibold">Название</label>
             <input type="text" class="form-control" name="name" id="stream_name"
-                placeholder="FreePBX SIP, SSH Tunnel..." value="{{ stream.name if stream else '' }}" required>
+                placeholder="FreePBX SIP, SSH Tunnel..." value="{{ stream.name if stream else '' }}" required maxlength="128">
         </div>
     </div>
 
@@ -36,7 +37,7 @@
     <div class="row mb-3">
         <div class="col-md-4">
             <label class="form-label fw-semibold">Входящий порт (listen)</label>
-            <input type="number" class="form-control" name="listen_port" id="listen_port" placeholder="5060"
+            <input type="number" class="form-control" name="listen_port" id="listen_port" placeholder="5060" min="1" max="65535"
                 value="{{ stream.listen_port if stream else '' }}" required>
         </div>
         <div class="col-md-4">
@@ -60,11 +61,11 @@
         <div class="col-md-6">
             <label class="form-label fw-semibold">Внутренний IP (target)</label>
             <input type="text" class="form-control" name="target_host" placeholder="10.100.10.220"
-                value="{{ stream.target_host if stream else '' }}" required>
+                value="{{ stream.target_host if stream else '' }}" required maxlength="253">
         </div>
         <div class="col-md-6">
             <label class="form-label fw-semibold">Внутренний порт (target)</label>
-            <input type="number" class="form-control" name="target_port" id="target_port" placeholder="5060"
+            <input type="number" class="form-control" name="target_port" id="target_port" placeholder="5060" min="1" max="65535"
                 value="{{ stream.target_port if stream else '' }}" required>
         </div>
     </div>

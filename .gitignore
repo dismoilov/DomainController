@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+
+# SQLite (dev)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Logs / temp
+*.log
+*.bak
+*.bak.*
+
+# Secrets — на проде .env создаётся install.sh; в репо НЕ должен попадать
+.env
+.env.local
+*.secret
+
+# GeoIP databases (~130 MB, обновляются ежемесячно через скрипт deploy/update-geoip.sh)
+data/geoip/*.mmdb
+data/geoip/*.mmdb.gz
+
+# IDE
+.idea/
+.vscode/
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/

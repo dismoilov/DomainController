@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0"><i class="bi bi-sliders"></i> Настройки</h1>
+</div>
+
+<div class="alert alert-info small">
+    <i class="bi bi-info-circle"></i> Эти настройки применяются сразу после сохранения.
+    Rate-limit /login и интервалы health-check берутся из кэша (TTL 60 сек) —
+    новые значения вступят в силу в течение минуты.
+</div>
+
+<form method="post" action="{{ url_for('api_settings_update') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    {% for category, items in by_category.items() %}
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-header bg-white fw-semibold">
+            {{ category_titles.get(category, category) }}
+        </div>
+        <div class="card-body">
+            {% for s in items %}
+            <div class="row mb-3 align-items-center">
+                <label class="col-md-5 col-form-label" for="inp-{{ s.key }}">
+                    <code>{{ s.key }}</code><br>
+                    <span class="small text-muted">{{ s.desc }}</span>
+                </label>
+                <div class="col-md-3">
+                    {% if s.vtype == "int" %}
+                    <input type="number" class="form-control" id="inp-{{ s.key }}" name="{{ s.key }}"
+                           value="{{ s.current }}"
+                           {% if s.min_val is not none %}min="{{ s.min_val }}"{% endif %}
+                           {% if s.max_val is not none %}max="{{ s.max_val }}"{% endif %}
+                           required>
+                    {% elif s.vtype == "bool" %}
+                    <select class="form-select" id="inp-{{ s.key }}" name="{{ s.key }}">
+                        <option value="true"  {% if s.current %}selected{% endif %}>Включено</option>
+                        <option value="false" {% if not s.current %}selected{% endif %}>Выключено</option>
+                    </select>
+                    {% else %}
+                    <input type="text" class="form-control" id="inp-{{ s.key }}" name="{{ s.key }}"
+                           value="{{ s.current }}" maxlength="1024">
+                    {% endif %}
+                </div>
+                <div class="col-md-4 small text-muted">
+                    {% if s.vtype == "int" and s.min_val is not none %}
+                    Диапазон: <strong>{{ s.min_val }}–{{ s.max_val }}</strong><br>
+                    {% endif %}
+                    По умолчанию: <code>{{ s.default }}</code>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-save"></i> Сохранить
+        </button>
+        <a class="btn btn-outline-secondary" href="{{ url_for('dashboard') }}">Отмена</a>
+    </div>
+</form>
+{% endblock %}

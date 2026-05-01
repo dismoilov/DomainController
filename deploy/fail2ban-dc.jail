@@ -1,0 +1,20 @@
+# Fail2ban jail для DomainController.
+# Разместить как /etc/fail2ban/jail.d/domain-controller.conf
+#
+# Блокирует IP в iptables на 1 час после 5 попыток с 429 в течение 10 минут —
+# это поверх in-memory rate-limit в приложении и limit_req_zone в nginx.
+# Тройная защита (nginx + app + iptables) от брутфорса.
+
+[domain-controller]
+enabled  = true
+port     = 8080
+filter   = domain-controller
+logpath  = /var/log/nginx/access.log
+maxretry = 5
+findtime = 600
+bantime  = 3600
+banaction = iptables-multiport
+
+# Игнорируем внутреннюю сеть и localhost — нужно чтобы свои VPN-клиенты
+# не заблокировались при тестировании.
+ignoreip = 127.0.0.1/8 10.0.0.0/8

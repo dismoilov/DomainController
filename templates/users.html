@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0"><i class="bi bi-people"></i> Пользователи и API-токены</h1>
+</div>
+
+{# Показ только что созданного токена — ровно один раз #}
+{% if new_token %}
+<div class="alert alert-warning border-warning mb-4" role="alert">
+    <div class="d-flex align-items-start">
+        <i class="bi bi-key-fill fs-3 me-2 text-warning"></i>
+        <div class="flex-fill">
+            <strong>Новый токен: {{ new_token_name }}</strong>
+            <div class="small text-muted mt-1">Сохраните сейчас — после закрытия страницы он НЕ будет виден снова.</div>
+            <div class="input-group mt-2">
+                <input type="text" class="form-control font-monospace" value="{{ new_token }}" id="new-token-input" readonly>
+                <button class="btn btn-outline-dark" type="button" onclick="copyToken()"><i class="bi bi-clipboard"></i> Копировать</button>
+            </div>
+            <div class="small text-muted mt-2">
+                Использование: <code>curl -H "Authorization: Bearer {{ new_token[:8] }}..." https://&lt;panel&gt;/api/...</code>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row g-3">
+    {# Создание пользователя #}
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold">
+                <i class="bi bi-person-plus"></i> Создать пользователя
+            </div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('users_create') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label class="form-label">Логин</label>
+                        <input type="text" class="form-control" name="username"
+                            pattern="^[A-Za-z0-9._-]{2,64}$" required maxlength="64"
+                            title="2-64 символа, только буквы/цифры/._-">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Пароль (минимум 8 символов)</label>
+                        <input type="password" class="form-control" name="password" required minlength="8" maxlength="128">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Роль</label>
+                        <select class="form-select" name="role">
+                            <option value="viewer" selected>viewer — только чтение</option>
+                            <option value="admin">admin — полный доступ</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-plus-lg"></i> Создать
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {# Список пользователей #}
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold d-flex justify-content-between">
+                <span><i class="bi bi-person-lines-fill"></i> Пользователи</span>
+                <span class="badge bg-secondary">{{ users|length }}</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Логин</th>
+                                <th>Роль</th>
+                                <th class="text-end" style="width:260px">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for u in users %}
+                            <tr>
+                                <td><i class="bi bi-person-circle"></i> <strong>{{ u.username }}</strong>
+                                    {% if u.username == session.get('username') %}
+                                    <span class="badge bg-info ms-1">вы</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if u.role == 'admin' %}
+                                    <span class="badge bg-success">admin</span>
+                                    {% else %}
+                                    <span class="badge bg-warning text-dark">viewer</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        {# смена роли #}
+                                        {% if u.username != session.get('username') %}
+                                        <form action="{{ url_for('users_set_role', user_id=u.id) }}" method="post" class="d-inline m-0"
+                                            onsubmit="return confirm('Сменить роль {{ u.username }} на {{ 'viewer' if u.role == 'admin' else 'admin' }}?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <input type="hidden" name="role" value="{{ 'viewer' if u.role == 'admin' else 'admin' }}">
+                                            <button class="btn btn-outline-secondary" title="Сменить роль">
+                                                <i class="bi bi-arrow-left-right"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+
+                                        {# смена пароля #}
+                                        <button type="button" class="btn btn-outline-secondary" title="Сменить пароль"
+                                            data-bs-toggle="modal" data-bs-target="#passwordModal-{{ u.id }}">
+                                            <i class="bi bi-key"></i>
+                                        </button>
+
+                                        {# создать токен #}
+                                        <button type="button" class="btn btn-outline-primary" title="Создать API-токен"
+                                            data-bs-toggle="modal" data-bs-target="#tokenModal-{{ u.id }}">
+                                            <i class="bi bi-key-fill"></i>
+                                        </button>
+
+                                        {# удалить #}
+                                        {% if u.username != session.get('username') %}
+                                        <form action="{{ url_for('users_delete', user_id=u.id) }}" method="post" class="d-inline m-0"
+                                            onsubmit="return confirm('Удалить пользователя {{ u.username }} и все его токены?');">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                            <button class="btn btn-outline-danger" title="Удалить">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+
+                            {# password modal #}
+                            <div class="modal fade" id="passwordModal-{{ u.id }}" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <form class="modal-content" method="post" action="{{ url_for('users_set_password', user_id=u.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Сменить пароль: {{ u.username }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <label class="form-label">Новый пароль (минимум 8 символов)</label>
+                                            <input type="password" class="form-control" name="password" required minlength="8" maxlength="128" autocomplete="new-password">
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                            <button type="submit" class="btn btn-primary">Обновить</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                            {# token modal #}
+                            <div class="modal fade" id="tokenModal-{{ u.id }}" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <form class="modal-content" method="post" action="{{ url_for('tokens_create', user_id=u.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">API-токен для: {{ u.username }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <label class="form-label">Название (описание, где будет использоваться)</label>
+                                            <input type="text" class="form-control" name="name" required maxlength="64" placeholder="monitoring, ci-deploy...">
+                                            <div class="form-text">Токен будет показан ОДИН раз после создания.</div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                            <button type="submit" class="btn btn-primary">Создать токен</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Токены — только хэши, без raw #}
+<div class="row g-3 mt-2">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 fw-semibold d-flex justify-content-between">
+                <span><i class="bi bi-key"></i> API-токены</span>
+                <span class="badge bg-secondary">{{ tokens|length }}</span>
+            </div>
+            <div class="card-body p-0">
+                {% if tokens %}
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Пользователь</th>
+                                <th>Название</th>
+                                <th>Создан</th>
+                                <th>Последнее использование</th>
+                                <th class="text-end" style="width:100px">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for t in tokens %}
+                            <tr>
+                                <td>{{ t.user.username if t.user else '—' }}</td>
+                                <td><code>{{ t.name }}</code></td>
+                                <td class="small text-muted">{{ t.created_at.strftime('%Y-%m-%d %H:%M') if t.created_at else '—' }}</td>
+                                <td class="small text-muted">
+                                    {% if t.last_used_at %}
+                                    {{ t.last_used_at.strftime('%Y-%m-%d %H:%M') }}
+                                    {% else %}
+                                    <span class="text-warning">не использовался</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <form action="{{ url_for('tokens_revoke', token_id=t.id) }}" method="post" class="d-inline m-0"
+                                        onsubmit="return confirm('Отозвать токен «{{ t.name }}»? После этого curl-ы с этим токеном перестанут работать.');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button class="btn btn-sm btn-outline-danger" title="Отозвать">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="p-3 text-muted text-center">
+                    Токенов пока нет. Чтобы создать — нажмите на кнопку <i class="bi bi-key-fill"></i> рядом с пользователем.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyToken() {
+    const input = document.getElementById('new-token-input');
+    input.select();
+    input.setSelectionRange(0, 99999);
+    navigator.clipboard.writeText(input.value).then(() => {
+        const btn = event.currentTarget;
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check-lg"></i> Скопировано';
+        btn.classList.add('btn-success');
+        setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('btn-success'); }, 2000);
+    });
+}
+</script>
+{% endblock %}

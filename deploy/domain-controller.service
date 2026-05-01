@@ -1,0 +1,53 @@
+[Unit]
+Description=Domain Controller Web Panel
+After=network.target nginx.service
+Wants=nginx.service
+
+# Защита от crash-loop: если за 60 сек произошло 5 фейлов подряд — systemd
+# остановит сервис (а не будет молча рестартовать вечно). Значения равны
+# дефолтам systemd, но явная запись документирует намерение и переживёт
+# смену дефолтов между версиями systemd.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/domain-controller
+EnvironmentFile=/opt/domain-controller/.env
+ExecStart=/opt/domain-controller/venv/bin/gunicorn -c /opt/domain-controller/gunicorn.conf.py wsgi:application
+Restart=always
+RestartSec=5
+
+# Ресурсные лимиты — защита от утечек/зацикливания парсера и API-агрегаций,
+# чтобы одно приложение не утопило сервер целиком.
+MemoryMax=512M
+MemoryHigh=384M
+CPUQuota=75%
+TasksMax=200
+LimitNOFILE=4096
+
+# Приложение нуждается в root для:
+#  - nginx -t && systemctl reload nginx
+#  - certbot certonly --webroot
+#  - запись в /etc/nginx/conf.d/domain-routes.conf и /etc/nginx/stream-routes.conf
+# Поэтому User=root, но максимально сужаем привилегии через sandbox-директивы.
+User=root
+Group=root
+
+# systemd hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectSystem=full
+ReadWritePaths=/etc/nginx /etc/letsencrypt /var/www/certbot /var/log/nginx /opt/domain-controller
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

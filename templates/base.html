@@ -55,9 +55,50 @@
             border-color: #0d6efd;
         }
 
-        .nav-link.active {
-            font-weight: 600;
+        /* ── Navbar active-state: подсвечиваем кнопку текущего раздела ── */
+        .navbar-dark .navbar-nav .nav-link {
+            border-radius: 6px;
+            padding: 6px 10px;
+            margin: 0 1px;
+            transition: background 0.15s, color 0.15s;
         }
+        .navbar-dark .navbar-nav .nav-link:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+        }
+        .navbar-dark .navbar-nav .nav-link.active {
+            background: #0d6efd;
+            color: #fff !important;
+            font-weight: 600;
+            box-shadow: 0 2px 6px rgba(13, 110, 253, 0.4);
+        }
+
+        /* ── Адаптивность ── */
+        /* На узких экранах (<= md) добавочные пункты nav прячутся в гамбургер.
+           Компактим внутренние компоненты, чтобы всё помещалось. */
+        @media (max-width: 1199.98px) {
+            .navbar-dark .navbar-nav .nav-link { padding: 6px 8px; font-size: 0.92rem; }
+        }
+        @media (max-width: 991.98px) {
+            /* Гамбургер-режим: ссылки идут вертикально, разделим заметнее */
+            .navbar-dark .navbar-nav .nav-link {
+                margin: 2px 0;
+                padding: 8px 12px;
+            }
+            .navbar-text { display: block; padding: 8px 12px; }
+        }
+        @media (max-width: 575.98px) {
+            /* Очень узкие экраны: убираем margin у container, h1/h3 поджимаем */
+            .container, .container-xl { padding-left: 12px; padding-right: 12px; }
+            h1, .h1 { font-size: 1.5rem; }
+            h2, .h2 { font-size: 1.3rem; }
+            h3, .h3 { font-size: 1.15rem; }
+            .display-6 { font-size: 1.6rem; }
+            .card-body { padding: 0.8rem; }
+            .table-sm { font-size: 0.82rem; }
+        }
+        /* Скроллбар у длинных таблиц на узких экранах — visible */
+        .table-responsive { -webkit-overflow-scrolling: touch; }
     </style>
 </head>
 
@@ -72,32 +113,51 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
+                {# Текущий endpoint и группы для подсветки активной кнопки.
+                   Под "Домены" попадают также страницы редактирования/просмотра одного домена,
+                   аналогично — "Stream" объединяет index/add/edit/view. #}
+                {% set _ep = request.endpoint or '' %}
+                {% set _domain_eps = ['index', 'add', 'edit', 'view'] %}
+                {% set _stream_eps = ['streams_index', 'streams_add', 'streams_edit', 'streams_view'] %}
                 <div class="navbar-nav me-auto">
-                    <a class="nav-link" href="{{ url_for('dashboard') }}"><i class="bi bi-speedometer2"></i>
+                    <a class="nav-link {% if _ep == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}"><i class="bi bi-speedometer2"></i>
                         Dashboard</a>
-                    <a class="nav-link" href="{{ url_for('index') }}"><i class="bi bi-diagram-3"></i> Домены</a>
-                    <a class="nav-link" href="{{ url_for('streams_index') }}"><i class="bi bi-broadcast"></i> Stream</a>
-                    <a class="nav-link" href="{{ url_for('statistics_page') }}"><i class="bi bi-bar-chart-line"></i>
+                    <a class="nav-link {% if _ep in _domain_eps %}active{% endif %}" href="{{ url_for('index') }}"><i class="bi bi-diagram-3"></i> Домены</a>
+                    <a class="nav-link {% if _ep in _stream_eps %}active{% endif %}" href="{{ url_for('streams_index') }}"><i class="bi bi-broadcast"></i> Stream</a>
+                    <a class="nav-link {% if _ep == 'statistics_page' %}active{% endif %}" href="{{ url_for('statistics_page') }}"><i class="bi bi-bar-chart-line"></i>
                         Статистика</a>
-                    <a class="nav-link" href="{{ url_for('requests_page') }}"><i class="bi bi-list-ul"></i> Запросы</a>
-                    <a class="nav-link" href="{{ url_for('logs') }}"><i class="bi bi-journal-text"></i> Логи</a>
+                    <a class="nav-link {% if _ep == 'requests_page' %}active{% endif %}" href="{{ url_for('requests_page') }}"><i class="bi bi-list-ul"></i> Запросы</a>
+                    <a class="nav-link {% if _ep == 'logs' %}active{% endif %}" href="{{ url_for('logs') }}"><i class="bi bi-journal-text"></i> Логи</a>
+                    {% if session.get('role') == 'admin' %}
+                    <a class="nav-link {% if _ep == 'firewall_page' %}active{% endif %}" href="{{ url_for('firewall_page') }}"><i class="bi bi-shield-fill-exclamation"></i> Firewall</a>
+                    <a class="nav-link {% if _ep == 'users_index' %}active{% endif %}" href="{{ url_for('users_index') }}"><i class="bi bi-people"></i> Пользователи</a>
+                    <a class="nav-link {% if _ep == 'settings_page' %}active{% endif %}" href="{{ url_for('settings_page') }}"><i class="bi bi-sliders"></i> Настройки</a>
+                    {% endif %}
                 </div>
+                {% if session.get('role') == 'admin' %}
                 <div class="navbar-nav">
-                    <a class="nav-link" href="{{ url_for('add') }}"><i class="bi bi-plus-circle"></i> Домен</a>
-                    <a class="nav-link" href="{{ url_for('streams_add') }}"><i class="bi bi-plus-circle"></i> Stream</a>
+                    <a class="nav-link {% if _ep == 'add' %}active{% endif %}" href="{{ url_for('add') }}"><i class="bi bi-plus-circle"></i> Домен</a>
+                    <a class="nav-link {% if _ep == 'streams_add' %}active{% endif %}" href="{{ url_for('streams_add') }}"><i class="bi bi-plus-circle"></i> Stream</a>
                 </div>
+                {% endif %}
                 <span class="navbar-text mx-3 text-light">
                     <i class="bi bi-person-circle"></i> {{ session.get('username') }}
+                    {% if session.get('role') == 'viewer' %}
+                    <span class="badge bg-warning text-dark ms-1">viewer</span>
+                    {% endif %}
                 </span>
-                <a class="btn btn-outline-light btn-sm" href="{{ url_for('logout') }}">
-                    <i class="bi bi-box-arrow-right"></i> Выход
-                </a>
+                <form action="{{ url_for('logout') }}" method="post" class="d-inline m-0">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-outline-light btn-sm">
+                        <i class="bi bi-box-arrow-right"></i> Выход
+                    </button>
+                </form>
             </div>
             {% endif %}
         </div>
     </nav>
 
-    <div class="container">
+    <div class="container-xl">
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         <div class="mt-2">

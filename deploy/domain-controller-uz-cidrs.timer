@@ -1,0 +1,12 @@
+[Unit]
+Description=Monthly refresh of Uzbekistan CIDR allowlist (1st of month, 03:45 UTC)
+Requires=domain-controller-uz-cidrs.service
+
+[Timer]
+OnCalendar=*-*-01 03:45:00
+Persistent=yes
+RandomizedDelaySec=1800
+Unit=domain-controller-uz-cidrs.service
+
+[Install]
+WantedBy=timers.target

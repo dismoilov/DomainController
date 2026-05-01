@@ -6,6 +6,7 @@
 </h1>
 
 <form method="post" class="card p-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <!-- Основное -->
     <h6 class="text-muted mb-3"><i class="bi bi-globe"></i> Основное</h6>
@@ -13,24 +14,26 @@
     <div class="mb-3">
         <label class="form-label fw-semibold">Домен</label>
         <input type="text" class="form-control" name="domain" placeholder="пример: nettech.uz или pbx.nettech.uz"
-            value="{{ route.domain if route else '' }}" required>
+            value="{{ route.domain if route else '' }}" required maxlength="253"
+            pattern="^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*$"
+            title="Разрешены буквы, цифры, точка, дефис. Длина до 253 символов.">
     </div>
 
     <div class="row mb-3">
         <div class="col-md-6">
             <label class="form-label fw-semibold">Внутренний IP (target)</label>
             <input type="text" class="form-control" name="target_host" placeholder="10.100.10.240"
-                value="{{ route.target_host if route else '' }}" required>
+                value="{{ route.target_host if route else '' }}" required maxlength="253">
         </div>
         <div class="col-md-3">
             <label class="form-label fw-semibold">Внутренний порт</label>
-            <input type="number" class="form-control" name="target_port" placeholder="80"
+            <input type="number" class="form-control" name="target_port" placeholder="80" min="1" max="65535"
                 value="{{ route.target_port if route else 80 }}" required>
         </div>
         <div class="col-md-3">
             <label class="form-label fw-semibold">Группа</label>
             <input type="text" class="form-control" name="group_name" placeholder="NetTech, VoIP..."
-                value="{{ route.group_name if route and route.group_name else '' }}">
+                value="{{ route.group_name if route and route.group_name else '' }}" maxlength="128">
         </div>
     </div>
 
@@ -46,12 +49,12 @@
     <div class="row mb-3">
         <div class="col-md-6">
             <label class="form-label">HTTP listen порт</label>
-            <input type="number" class="form-control" name="listen_port" placeholder="80"
+            <input type="number" class="form-control" name="listen_port" placeholder="80" min="1" max="65535"
                 value="{{ route.listen_port if route else 80 }}">
         </div>
         <div class="col-md-6">
             <label class="form-label">HTTPS/SSL listen порт</label>
-            <input type="number" class="form-control" name="listen_port_ssl" placeholder="443"
+            <input type="number" class="form-control" name="listen_port_ssl" placeholder="443" min="1" max="65535"
                 value="{{ route.listen_port_ssl if route else 443 }}">
         </div>
     </div>
@@ -93,6 +96,22 @@
         </div>
     </div>
 
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="enable_bot_protection" name="enable_bot_protection"
+                    {% if not route or route.enable_bot_protection %}checked{% endif %}>
+                <label class="form-check-label" for="enable_bot_protection">
+                    <i class="bi bi-robot text-warning"></i> Bot protection (блок сканеров по User-Agent)
+                </label>
+            </div>
+            <div class="form-text">
+                Включено по умолчанию. Выключите для публичных сайтов, если на них ходят легитимные
+                боты (SEO-пауки, crawlers, собственные скрипты), которые могут попасть под регулярку.
+            </div>
+        </div>
+    </div>
+
     <hr>
     <!-- SSL Сертификаты -->
     <h6 class="text-muted mb-3"><i class="bi bi-file-earmark-lock"></i> SSL-сертификаты
@@ -103,13 +122,15 @@
         <div class="col-md-6">
             <label class="form-label">fullchain.pem</label>
             <input type="text" class="form-control form-control-sm" name="ssl_cert_path"
-                placeholder="/etc/letsencrypt/live/DOMAIN/fullchain.pem"
+                placeholder="/etc/letsencrypt/live/DOMAIN/fullchain.pem" maxlength="512"
+                pattern="^/etc/letsencrypt/live/[A-Za-z0-9.\-_]+/(fullchain|privkey|cert|chain)\.pem$"
                 value="{{ route.ssl_cert_path if route and route.ssl_cert_path else '' }}">
         </div>
         <div class="col-md-6">
             <label class="form-label">privkey.pem</label>
             <input type="text" class="form-control form-control-sm" name="ssl_key_path"
-                placeholder="/etc/letsencrypt/live/DOMAIN/privkey.pem"
+                placeholder="/etc/letsencrypt/live/DOMAIN/privkey.pem" maxlength="512"
+                pattern="^/etc/letsencrypt/live/[A-Za-z0-9.\-_]+/(fullchain|privkey|cert|chain)\.pem$"
                 value="{{ route.ssl_key_path if route and route.ssl_key_path else '' }}">
         </div>
     </div>

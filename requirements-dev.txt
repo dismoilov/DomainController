@@ -1,0 +1,13 @@
+# Зависимости для разработки и тестов. На проде НЕ ставятся.
+# Установка:
+#     venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+#
+# Запуск тестов:
+#     DEV_MODE=1 DC_NO_BG_THREADS=1 venv/bin/python -m pytest tests/
+#
+# С coverage-отчётом:
+#     DEV_MODE=1 DC_NO_BG_THREADS=1 venv/bin/python -m pytest tests/ --cov=app --cov-report=term-missing
+
+pytest==9.0.3
+pytest-cov==7.1.0
+coverage==7.13.5

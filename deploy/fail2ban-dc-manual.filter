@@ -1,0 +1,9 @@
+# Filter для jail dc-manual. Никогда не срабатывает автоматически —
+# регулярка заведомо ничего не матчит. Jail существует для РУЧНЫХ банов
+# через `fail2ban-client set dc-manual banip <ip>` (из нашего UI).
+#
+# Разместить как /etc/fail2ban/filter.d/dc-manual.conf
+
+[Definition]
+failregex = ^__NEVER_MATCHES_DC_MANUAL_JAIL__<HOST>$
+ignoreregex =

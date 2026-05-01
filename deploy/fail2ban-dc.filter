@@ -1,0 +1,10 @@
+# Fail2ban filter для DomainController — ловит HTTP 429 от /login.
+# Разместить как /etc/fail2ban/filter.d/domain-controller.conf
+#
+# Использует access.log nginx в стандартном combined-формате. Смотрим за
+# ответами 429 именно на /login — это триггер rate-limit приложения или
+# nginx limit_req zone=panel_login.
+
+[Definition]
+failregex = ^<HOST>\s-\s.*"(?:GET|POST)\s/login[^"]*"\s429\s
+ignoreregex =
